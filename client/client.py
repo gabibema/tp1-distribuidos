@@ -1,7 +1,8 @@
 
 class Client:
     def __init__(self, config):
-        self.config = config
+        self.books_path = config['books_path']
+        self.ratings_path = config['ratings_path'] 
 
     def start(self):
-        print("Client started")
+        pass
