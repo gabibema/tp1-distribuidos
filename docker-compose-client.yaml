@@ -2,10 +2,11 @@ version: '3.12'
 services:
   client:
     image: client:latest
-    entrypoint: python3 /main.py
+    entrypoint: python3 /app/main.py
     volumes:
-      - ./config/client.ini:/config.ini
-      - ./data:/data
+      - ./config/client.ini:/app/config.ini
+      - ./lib:/app/lib
+      - ./data:/app/data
     networks: 
       - default
   
