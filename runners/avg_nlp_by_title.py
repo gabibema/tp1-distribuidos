@@ -14,8 +14,8 @@ def result(accumulator):
 
 def main():
     rabbit_hostname = 'localhost'
-    src_queue = ''
-    dst_queue = ''
+    src_queue = 'nlp_title_q'
+    dst_queue = 'avg_nlp_q'
     accumulator = {}
     runner = Aggregate(rabbit_hostname, src_queue, dst_queue, aggregate, result, accumulator)
     runner.start()

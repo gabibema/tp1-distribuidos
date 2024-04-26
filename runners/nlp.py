@@ -1,7 +1,7 @@
 from lib.runner import Map
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
     
-def sentiment(self):
+def sentiment(message):
     review = json.loads(message)
     score = SentimentIntensityAnalyzer().polarity_scores(review['review/text']).compound
     return json.dumps({'Title': review['Title'], 'score': score})

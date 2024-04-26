@@ -10,8 +10,8 @@ def result(accumulator):
 
 def main():
     rabbit_hostname = 'localhost'
-    src_queue = ''
-    dst_queue = ''
+    src_queue = '90s_rev_q'
+    dst_queue = 'top_90s_q'
     accumulator = {}
     runner = Aggregate(rabbit_hostname, src_queue, dst_queue, aggregate, result, accumulator)
     runner.start()
