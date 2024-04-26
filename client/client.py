@@ -1,5 +1,6 @@
 from threading import Thread
 from lib.utils import wait_rabbitmq, RabbitMQ, BOOKS_EXCHANGE, RATINGS_EXCHANGE
+from pika.exceptions import AMQPError
 
 BATCH_AMOUNT = 200
 
@@ -12,56 +13,49 @@ class Client:
         self.ratings_queues = config['ratings_queues']
 
         self.books_sender = Thread(target=self.__send_books)
-        self.ratings_sender = Thread(target=self.__send_ratings)
+        #self.ratings_sender = Thread(target=self.__send_ratings)
 
     def start(self):
         wait_rabbitmq()
         self.books_sender.start()
-        self.ratings_sender.start()
-        
+        #self.ratings_sender.start()
         
     def __send_books(self):
         rabbit = RabbitMQ()
-        exchange_name = BOOKS_EXCHANGE
-        rabbit.create_exchange(exchange_name, 'direct')
         for queue in self.books_queues:
             rabbit.create_queue(queue)
-            rabbit.channel.queue_bind(queue=queue, exchange=exchange_name, routing_key=queue)
 
         with open(self.books_path, 'r') as f:
             batch = []
             for line in f:
                 batch.append(line.strip())
                 if len(batch) >= BATCH_AMOUNT:
-                    for msg in batch:
-                        rabbit.publish(msg, exchange=exchange_name)
+                    print("Publishing batch")
+                    rabbit.publish_in_queues("hello", queues=self.books_queues)
                     batch = []
-            if batch:
-                for msg in batch:
-                    rabbit.publish(msg, exchange=exchange_name)
+            if batch:            
+                rabbit.publish_in_queues("hello", queues=self.books_queues)
+
         
         rabbit.close()
 
-    def __send_ratings(self):
-        rabbit = RabbitMQ()
-        exchange_name = RATINGS_EXCHANGE
-        rabbit.create_exchange(exchange_name, 'direct')
-        for queue in self.ratings_queues:
-            rabbit.create_queue(queue)
-            rabbit.channel.queue_bind(queue=queue, exchange=exchange_name, routing_key=queue)
 
-        with open(self.ratings_path, 'r') as f:
-            batch = []
-            for line in f:
-                batch.append(line.strip())
-                if len(batch) >= BATCH_AMOUNT:
-                    for msg in batch:
-                        rabbit.publish(msg, exchange=exchange_name)
-                    batch = []
+    # def __send_ratings(self):
+    #     rabbit = RabbitMQ()
 
-            if batch:
-                for msg in batch:
-                    rabbit.publish(msg, exchange=exchange_name)
+    #     for queue in self.ratings_queues:
+    #         rabbit.create_queue(queue)
+
+    #     with open(self.ratings_path, 'r') as f:
+    #         batch = []
+    #         for line in f:
+    #             batch.append(line.strip())
+    #             if len(batch) >= BATCH_AMOUNT:
+    #                 rabbit.publish_in_queues("hello", queues=self.ratings_queues)
+    #             batch = []
+
+    #         if batch:
+    #             rabbit.publish_in_queues("hello", queues=self.ratings_queues)
         
-        rabbit.close()
+    #     rabbit.close()
 

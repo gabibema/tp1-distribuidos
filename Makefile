@@ -5,6 +5,8 @@ all:
 
 docker-image:
 	docker build -f ./rabbitmq/Dockerfile -t "rabbitmq:latest" .
+	docker build -f ./title_filter/Dockerfile -t "title_filter:latest" .
+	docker compose -f docker-compose-dev.yaml up -d --build
 .PHONY: docker-image
 
 docker-image-client:

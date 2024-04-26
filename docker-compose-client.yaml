@@ -1,7 +1,9 @@
-version: '3.12'
+version: '3'
 services:
   client:
-    image: client:latest
+    build:
+      context: .
+      dockerfile: ./client/Dockerfile
     entrypoint: python3 /app/main.py
     volumes:
       - ./config/client.ini:/app/config.ini

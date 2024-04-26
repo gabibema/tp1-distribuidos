@@ -1,5 +1,4 @@
-FROM python:3.12-slim
+FROM rabbitmq-python-base
 WORKDIR /app
-COPY client /app
-RUN pip install --upgrade pip && \
-    pip install pika
+COPY ./client /app
+COPY ./lib /app/lib

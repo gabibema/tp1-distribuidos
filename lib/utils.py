@@ -53,6 +53,12 @@ class RabbitMQ:
             properties=pika.BasicProperties(delivery_mode=PERSISTENT_DELIVERY_MODE)
         )
 
+    def publish_in_queues(self, body, queues=[], exchange=''):
+        """Publishes a message to multiple queues."""
+        print(f"Publishing message to {queues}...")
+        for queue in queues:
+            self.publish(body, queue, exchange)
+
 
     def consume(self, queue, cb):
         """Consumes messages from a queue using a callback function."""
