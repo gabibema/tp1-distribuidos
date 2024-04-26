@@ -15,7 +15,6 @@ class MessageFilter:
     def process_message(self, ch, method, properties, body):
         """Callback function to process messages."""
         print(f"Received message: {body.decode()}")
-        ch.basic_ack(delivery_tag=method.delivery_tag)
         
     def start_consuming(self):
         """Starts consuming messages from the specified queue."""

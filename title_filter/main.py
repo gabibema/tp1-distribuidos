@@ -2,7 +2,7 @@ from filter import MessageFilter
 from lib.utils import wait_rabbitmq
 
 def main():
-    queue_name = 'computer_queue'
+    queue_name = 'computers_queue'
     wait_rabbitmq()
     message_filter = MessageFilter(queue_name)
     
