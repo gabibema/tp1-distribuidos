@@ -1,2 +1,4 @@
-FROM python:3.12-slim
-COPY client /
+FROM rabbitmq-python-base
+WORKDIR /app
+COPY ./client /app
+COPY ./lib /app/lib

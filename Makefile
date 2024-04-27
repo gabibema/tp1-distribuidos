@@ -5,6 +5,8 @@ all:
 
 docker-image:
 	docker build -f ./rabbitmq/Dockerfile -t "rabbitmq:latest" .
+	docker build -f ./title_filter/Dockerfile -t "title_filter:latest" .
+	docker build -f ./client/Dockerfile -t "client:latest" .
 .PHONY: docker-image
 
 docker-image-client:
@@ -23,6 +25,18 @@ docker-compose-down:
 	docker compose -f docker-compose-dev.yaml stop -t 1
 	docker compose -f docker-compose-dev.yaml down
 .PHONY: docker-compose-down
+
+docker-compose-down-client:
+	docker compose -f docker-compose-client.yaml stop -t 1
+	docker compose -f docker-compose-client.yaml down
+.PHONY: docker-compose-down-client
+
+docker-compose-down-all:
+	docker compose -f docker-compose-dev.yaml stop -t 1
+	docker compose -f docker-compose-dev.yaml down
+	docker compose -f docker-compose-client.yaml stop -t 1
+	docker compose -f docker-compose-client.yaml down
+.PHONY: docker-compose-down-all
 
 docker-compose-logs:
 	docker compose -f docker-compose-dev.yaml logs -f
