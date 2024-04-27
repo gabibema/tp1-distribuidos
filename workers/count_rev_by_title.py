@@ -6,14 +6,16 @@ def aggregate(message, accumulator):
     accumulator[msg['Title']] = accumulator.get(msg['Title'], 0) + 1
 
 def result(accumulator):
-    return [json.dumps({'Title': title, 'count': values.sum/values.count}) for title, values in accumulator.items()]
+    return [json.dumps({'Title': title, 'count': values.count}) for title, count in accumulator.items() if count >= 500]
 
 def main():
+    # Pending: move variables to env.
     rabbit_hostname = 'localhost'
     src_queue = '90s_rev_q'
-    dst_queue = 'top_90s_q'
+    src_exchange = '90s_rev_exch'
+    dst_exchange = 'top_90s_exch'
     accumulator = {}
-    worker = Aggregate(rabbit_hostname, src_queue, dst_queue, aggregate, result, accumulator)
+    worker = Aggregate(aggregate, result, accumulator, rabbit_hostname, src_queue, src_exchange, dst_exchange=dst_exchange)
     worker.start()
 
 if __name__ == '__main__':

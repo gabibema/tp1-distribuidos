@@ -10,12 +10,15 @@ def result(accumulator):
     return [msg[1] for msg in nlargest(10, accumulator)]
 
 def main():
+    # Pending: move variables to env.
     rabbit_hostname = 'localhost'
-    src_queue = 'nlp_title_q'
-    dst_queue = 'avg_nlp_q'
+    src_queue = 'top_90s_q'
+    src_exchange = '90s_rev_exch'
+    dst_exchange = 'output_exch'
+    dst_routing_key = 'top_90s_books'
     accumulator = []
-    runner = Aggregate(rabbit_hostname, src_queue, dst_queue, aggregate, result, accumulator)
-    runner.start()
+    worker = Aggregate(aggregate, result, accumulator, rabbit_hostname, src_queue, src_exchange, dst_exchange=dst_exchange, dst_routing_key=dst_routing_key)
+    worker.start()
 
 if __name__ == '__main__':
     main()

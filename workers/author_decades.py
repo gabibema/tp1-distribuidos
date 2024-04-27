@@ -1,4 +1,5 @@
 import json
+from pika.exchange_type import ExchangeType
 from lib.workers import Aggregate
 
 def aggregate(message, accumulator):
@@ -19,11 +20,15 @@ def result(accumulator):
     return [author for author, decades in accumulator.items() if len(decades) >= 10]
 
 def main():
-    rabbit_hostname = 'localhost'
-    src_queue = 'nlp_title_q'
-    dst_queue = 'avg_nlp_q'
+    # Pending: move variables to env.
     accumulator = []
-    worker = Aggregate(rabbit_hostname, src_queue, dst_queue, aggregate, result, accumulator)
+    rabbit_hostname = 'localhost'
+    src_queue = 'book_q'
+    src_exchange = 'books_exch'
+    src_routing_key = '#'
+    dst_exchange = 'output_exch'
+    dst_routing_key = 'author_decades'
+    worker = Aggregate(aggregate, result, accumulator, rabbit_hostname, src_queue, src_exchange, src_routing_key, ExchangeType.topic, dst_exchange, dst_routing_key)
     worker.start()
 
 if __name__ == '__main__':
