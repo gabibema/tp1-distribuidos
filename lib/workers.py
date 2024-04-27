@@ -4,12 +4,12 @@ import pika
 
 WAIT_TIME_PIKA = 15
 
-class Runner(ABC):
+class Worker(ABC):
     def new(self, rabbit_hostname, src_queue, dst_queue):
         connection = pika.BlockingConnection(pika.ConnectionParameters(host=rabbit_hostname))
         self.channel = connection.channel()
         self.channel.queue_declare(queue=src_queue, durable=True)
-        self.channel.basic_consume(queue=src_queue, on_message_callback=self.callback, auto_ack=True)
+        self.channel.basic_consume(queue=src_queue, on_message_callback=self.callback)
         self.dst_queue = dst_queue
         self.channel.queue_declare(queue=dst_queue, durable=True)
 
@@ -26,7 +26,7 @@ class Runner(ABC):
         pass
 
 
-class Filter(Runner):
+class Filter(Worker):
     def __init__(self, rabbit_hostname, src_queue, dst_queue, filter_condition):
         self.filter_condition = filter_condition
         self.new(rabbit_hostname, src_queue, dst_queue)
@@ -38,7 +38,7 @@ class Filter(Runner):
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
 
-class Map(Runner):
+class Map(Worker):
     def __init__(self, rabbit_hostname, src_queue, dst_queue, map_fn):
         self.map_fn = map_fn
         self.new(rabbit_hostname, src_queue, dst_queue)
@@ -49,7 +49,7 @@ class Map(Runner):
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
 
-class Aggregate(Runner):
+class Aggregate(Worker):
     def __init__(self, rabbit_hostname, src_queue, dst_queue, aggregate_fn, result_fn, accumulator):
         self.aggregate_fn = aggregate_fn
         self.result_fn = result_fn
@@ -67,4 +67,6 @@ class Aggregate(Runner):
 
 def wait_rabbitmq():
     """Pauses execution for few seconds in order start rabbitmq broker."""
+    # this needs to be moved to the docker compose as a readiness check
+    # we should first create rabbit, then workers, and finally start sending messages
     sleep(WAIT_TIME_PIKA)

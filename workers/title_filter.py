@@ -1,4 +1,4 @@
-from lib.runner import Filter
+from lib.workers import Filter
 
 def title_filter(message):
     msg = json.loads(message)
@@ -12,8 +12,8 @@ def main():
     rabbit_hostname = 'localhost'
     src_queue = 'fiction_rev_q'
     dst_queue = 'nlp_title_q'
-    runner = Filter(rabbit_hostname, src_queue, dst_queue, title_filter)
-    runner.start()
+    worker = Filter(rabbit_hostname, src_queue, dst_queue, title_filter)
+    worker.start()
 
 if __name__ == '__main__':
     main()

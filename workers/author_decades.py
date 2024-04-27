@@ -1,5 +1,5 @@
 import json
-from lib.runner import Aggregate
+from lib.workers import Aggregate
 
 def aggregate(message, accumulator):
     msg = json.loads(message)
@@ -23,8 +23,8 @@ def main():
     src_queue = 'nlp_title_q'
     dst_queue = 'avg_nlp_q'
     accumulator = []
-    runner = Aggregate(rabbit_hostname, src_queue, dst_queue, aggregate, result, accumulator)
-    runner.start()
+    worker = Aggregate(rabbit_hostname, src_queue, dst_queue, aggregate, result, accumulator)
+    worker.start()
 
 if __name__ == '__main__':
     main()
