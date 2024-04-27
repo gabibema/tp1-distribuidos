@@ -1,18 +1,25 @@
-import csv
-from io import StringIO
+def format_output(date_str, categories_str):
+    # Extraer solo el año usando split y maxsplit
+    year = date_str.split('-', maxsplit=1)[0]
+    year_dots = '.'.join(year)  # Separa los caracteres del año con puntos
+    
+    # Procesar la cadena de categorías, asumiendo que está en formato de lista como string
+    categories = categories_str.strip("[]")
+    categories = categories.replace("'", "").replace(" & ", ".")
+    categories_list = categories.split(", ")
+    categories_dots = '.'.join(categories_list)
+    
+    # Concatenar las partes con el formato deseado
+    result = f"{categories_dots}.{year_dots}"
+    return result
 
-# Encabezados predefinidos
-headers = ["Title", "description", "authors", "image", "previewLink", "publisher", "publishedDate", "infoLink", "categories", "ratingsCount"]
+# Ejemplo de uso:
+date1 = '2005-01-01'
+categories1 = "['Comics, Drama & Graphic Novels']"
+output1 = format_output(date1, categories1)
+print(output1)
 
-# Simulando un archivo CSV como string
-data = """Its Only Art If Its Well Hung!,,['Julie Strain'],http://books.google.com/books/content?id=DykPAAAACAAJ&printsec=frontcover&img=1&zoom=1&source=gbs_api,http://books.google.nl/books?id=DykPAAAACAAJ&dq=Its+Only+Art+If+Its+Well+Hung!&hl=&cd=1&source=gbs_api,,1996,http://books.google.nl/books?id=DykPAAAACAAJ&dq=Its+Only+Art+If+Its+Well+Hung!&hl=&source=gbs_api,['Comics & Graphic Novels']
-"Dr. Seuss: American Icon","Philip Nel takes a fascinating look into the key aspects of Seuss's career - his poetry, politics, art, marketing, and place in the popular imagination."" ""Nel argues convincingly that Dr. Seuss is one of the most influential poets in America. His nonsense verse, like that of Lewis Carroll and Edward Lear, has changed language itself, giving us new words like ""nerd."" And Seuss's famously loopy artistic style - what Nel terms an ""energetic cartoon surrealism"" - has been equally important, inspiring artists like filmmaker Tim Burton and illustrator Lane Smith. --from back cover",['Philip Nel'],http://books.google.com/books/content?id=IjvHQsCn_pgC&printsec=frontcover&img=1&zoom=1&edge=curl&source=gbs_api,http://books.google.nl/books?id=IjvHQsCn_pgC&printsec=frontcover&dq=Dr.+Seuss:+American+Icon&hl=&cd=1&source=gbs_api,A&C Black,2005-01-01,http://books.google.nl/books?id=IjvHQsCn_pgC&dq=Dr.+Seuss:+American+Icon&hl=&source=gbs_api,['Biography & Autobiography']
-""".split("\n")
-
-for row in data:
-    csv_file = StringIO(row)
-
-# Crear DictReader indicando los encabezados y el objeto de archivo
-    reader = csv.DictReader(csv_file, fieldnames=headers)
-    for row in reader:
-        print(row)
+date2 = '1992'
+categories2 = "['Comics']"
+output2 = format_output(date2, categories2)
+print(output2)

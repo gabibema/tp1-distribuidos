@@ -11,10 +11,8 @@ def get_config_params():
         config_params = {
             'books_queue': os.getenv('BOOKS_QUEUE', default=config['DEFAULT'].get('BOOKS_QUEUE')),
             'books_exchange': os.getenv('BOOKS_EXCHANGE', default=config['DEFAULT'].get('BOOKS_EXCHANGE')),
-            'books_keys': os.getenv('BOOKS_KEYS', default=config['DEFAULT'].get('BOOKS_KEYS')),
             'ratings_queue': os.getenv('RATINGS_QUEUE', default=config['DEFAULT'].get('RATINGS_QUEUE')),
             'ratings_exchange': os.getenv('RATINGS_EXCHANGE', default=config['DEFAULT'].get('RATINGS_EXCHANGE')),
-            'ratings_keys': os.getenv('RATINGS_KEYS', default=config['DEFAULT'].get('RATINGS_KEYS')),
             'log_level': os.getenv('LOG_LEVEL', default=config['DEFAULT'].get('LOG_LEVEL')),
         }
         print(config_params)

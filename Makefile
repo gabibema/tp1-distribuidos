@@ -6,7 +6,9 @@ all:
 docker-image:
 	docker build -f ./base-image/Dockerfile -t "rabbitmq-python-base:latest" .
 	docker build -f ./rabbitmq/Dockerfile -t "rabbitmq:latest" .
+	docker build -f ./gateway/Dockerfile -t "gateway:latest" .
 	docker build -f ./client/Dockerfile -t "client:latest" .
+	
 
 .PHONY: docker-image
 
