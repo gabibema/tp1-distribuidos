@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
-import sys, os
+from time import sleep
 import pika
 
+WAIT_TIME_PIKA = 15
 
 class Runner(ABC):
     def new(self, rabbit_hostname, src_queue, dst_queue):
@@ -33,7 +34,7 @@ class Filter(Runner):
     def callback(self, ch, method, properties, body):
         'Callback given to a RabbitMQ queue to invoke for each message in the queue'
         if self.filter_condition(body):
-            self.channel.basic_publish(exchange='', routing_key=self.dst_queue, body=message)
+            self.channel.basic_publish(exchange='', routing_key=self.dst_queue, body=body)
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
 
@@ -44,7 +45,7 @@ class Map(Runner):
 
     def callback(self, ch, method, properties, body):
         'Callback given to a RabbitMQ queue to invoke for each message in the queue'
-        self.channel.basic_publish(exchange='', routing_key=self.dst_queue, body=map_fn(message))
+        self.channel.basic_publish(exchange='', routing_key=self.dst_queue, body=self.map_fn(body))
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
 
@@ -57,8 +58,13 @@ class Aggregate(Runner):
 
     def callback(self, ch, method, properties, body):
         'Callback given to a RabbitMQ queue to invoke for each message in the queue'
-        self.aggregate_fn(message, self.accumulator)
+        self.aggregate_fn(body, self.accumulator)
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
-    def end():
+    def end(self):
         return self.result_fn(self.accumulator)
+
+
+def wait_rabbitmq():
+    """Pauses execution for few seconds in order start rabbitmq broker."""
+    sleep(WAIT_TIME_PIKA)
