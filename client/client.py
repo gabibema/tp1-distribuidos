@@ -30,7 +30,6 @@ class Client:
             for line in file:
                 batch.append(line.strip())
                 if len(batch) >= BATCH_AMOUNT:
-                    print("Publishing batch")
                     publisher.publish('\n'.join(batch))
                     batch = [headers]
             if batch:            
@@ -48,7 +47,6 @@ class Client:
             for line in file:
                 batch.append(line.strip())
                 if len(batch) >= BATCH_AMOUNT:
-                    print("Publishing batch")
                     rabbit.publish('\n'.join(batch))
                     batch = [headers]
             if batch:            

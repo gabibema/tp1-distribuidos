@@ -41,5 +41,4 @@ def get_books_keys(row):
     if len(categories_dots) + len(year_dots) > MAX_KEY_LENGTH:
         categories_dots = categories_dots[:MAX_KEY_LENGTH - len(year_dots) - 1]
 
-    print(f"{categories_dots}.{year_dots}")
     return f"{categories_dots}.{year_dots}"
