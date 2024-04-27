@@ -1,5 +1,5 @@
 from lib.runner import Filter
-    
+
 def title_filter(message):
     msg = json.loads(message)
     date = msg['publishedDate']
