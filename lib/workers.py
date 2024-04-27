@@ -65,6 +65,17 @@ class Aggregate(Worker):
         return self.result_fn(self.accumulator)
 
 
+class Publish(Worker):
+    def __init__(self, rabbit_hostname, dst_queue):
+        self.new(rabbit_hostname, '', dst_queue)
+    
+    def callback(self, ch, method, properties, body):
+        pass
+
+    def publish(self, message):
+        self.channel.basic_publish(exchange='', routing_key=self.dst_queue, body=message)
+
+
 def wait_rabbitmq():
     """Pauses execution for few seconds in order start rabbitmq broker."""
     # this needs to be moved to the docker compose as a readiness check
