@@ -2,8 +2,6 @@ import json
 import random
 from lib.runner import Aggregate
 
-AvgAccumulator = namedtuple('AvgAccumulator', ['sum', 'count'])
-
 def aggregate(message, accumulator):
     msg = json.loads(message)
     accumulator.append(msg['average'])
