@@ -1,5 +1,5 @@
 from threading import Thread
-from lib.workers import wait_rabbitmq, Publish
+from lib.workers import wait_rabbitmq, Sender
 
 BATCH_AMOUNT = 200
 
@@ -21,7 +21,7 @@ class Client:
         
     def __send_books(self):
 
-        publisher = Publish('rabbitmq', self.books_queue)
+        publisher = Sender('rabbitmq', self.books_queue)
 
         with open(self.books_path, 'r') as file:
             headers = file.readline().strip()
@@ -40,7 +40,7 @@ class Client:
 
     def __send_ratings(self):
 
-        rabbit = Publish('rabbitmq', self.ratings_queue)
+        rabbit = Sender('rabbitmq', self.ratings_queue)
         with open(self.ratings_path, 'r') as file:
             headers = file.readline().strip()
             batch = [headers]

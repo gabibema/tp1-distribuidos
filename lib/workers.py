@@ -1,17 +1,25 @@
 from abc import ABC, abstractmethod
+from csv import DictReader
+from io import StringIO
 from time import sleep
 import pika
 
 WAIT_TIME_PIKA = 15
 
 class Worker(ABC):
-    def new(self, rabbit_hostname, src_queue, dst_queue):
+    def new(self, rabbit_hostname, src_queue, dst_queue=None, exchange=None, exchange_type='direct'):
         connection = pika.BlockingConnection(pika.ConnectionParameters(host=rabbit_hostname))
         self.channel = connection.channel()
         self.channel.queue_declare(queue=src_queue, durable=True)
         self.channel.basic_consume(queue=src_queue, on_message_callback=self.callback)
-        self.dst_queue = dst_queue
-        self.channel.queue_declare(queue=dst_queue, durable=True)
+
+        if exchange is None:
+            self.dst_queue = dst_queue
+            self.channel.queue_declare(queue=dst_queue, durable=True)
+        else:
+            self.dst_queue = exchange
+            self.channel.exchange_declare(exchange=exchange, exchange_type=exchange_type)
+
 
     @abstractmethod
     def callback(self, ch, method, properties, body):
@@ -65,7 +73,7 @@ class Aggregate(Worker):
         return self.result_fn(self.accumulator)
 
 
-class Publish(Worker):
+class Sender(Worker):
     def __init__(self, rabbit_hostname, dst_queue):
         self.new(rabbit_hostname, '', dst_queue)
     
@@ -74,6 +82,24 @@ class Publish(Worker):
 
     def publish(self, message):
         self.channel.basic_publish(exchange='', routing_key=self.dst_queue, body=message)
+
+class Proxy(Worker):
+    def __init__(self, rabbit_hostname, src_queue, exchange, exchange_type='direct', keys=None):
+        self.keys = keys
+        self.new(rabbit_hostname, src_queue=src_queue, exchange=exchange, exchange_type=exchange_type)
+
+    def callback(self, ch, method, properties, body: bytes):
+        'Callback given to a RabbitMQ queue to invoke for each message in the queue'
+        message = body.decode('utf-8').split('\n')
+        headers = message.pop(0)
+
+        for row in message:
+            csv_file = StringIO(row)
+            reader = DictReader(csv_file, fieldnames=headers)
+            for row in reader:
+                routing_key = [row[key] for key in self.keys]
+                self.channel.basic_publish(exchange=self.dst_queue, routing_key=routing_key, body=row)
+
 
 
 def wait_rabbitmq():
