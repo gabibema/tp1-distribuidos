@@ -11,9 +11,9 @@ def result(accumulator):
 def main():
     # Pending: move variables to env.
     rabbit_hostname = 'rabbitmq'
-    src_queue = '90s_rev_q'
-    src_exchange = '90s_rev_exch'
-    dst_exchange = 'top_90s_exch'
+    src_queue = '90s_rev_queue'
+    src_exchange = '90s_rev_exchange'
+    dst_exchange = 'top_90s_exchange'
     accumulator = {}
     worker = Aggregate(aggregate, result, accumulator, rabbit_hostname, src_queue, src_exchange, dst_exchange=dst_exchange)
     worker.start()

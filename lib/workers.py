@@ -29,9 +29,7 @@ class Worker(ABC):
             self.dst_exchange = dst_exchange
             self.channel.exchange_declare(exchange=dst_exchange, exchange_type=dst_exchange_type)
 
-        if dst_routing_key:
-            self.channel.queue_declare(queue=dst_routing_key)
-            self.routing_key = dst_routing_key
+        self.routing_key = dst_routing_key
 
     def connect_to_peers(self):
         # set up control queues between workers that consume from the same queue
@@ -95,6 +93,7 @@ class Aggregate(Worker):
 class Sender(Worker):
     def __init__(self, rabbit_hostname, dst_queue):
         self.new(rabbit_hostname, dst_routing_key=dst_queue)
+        self.channel.queue_declare(queue=dst_queue)
     
     def callback(self, ch, method, properties, body):
         pass
@@ -109,15 +108,12 @@ class Proxy(Worker):
 
     def callback(self, ch, method, properties, body: bytes):
         'Callback given to a RabbitMQ queue to invoke for each message in the queue'
-        message = body.decode('utf-8').split('\n')
-        headers = message.pop(0).split(',')
-
-        for row in message:
-            csv_file = StringIO(row)
-            reader = DictReader(csv_file, fieldnames=headers)
-            for row in reader:
-                self.channel.basic_publish(exchange=self.dst_exchange, routing_key=self.get_keys(row), body=dumps(row))
-
+        message = body.decode('utf-8')
+        csv_stream = StringIO(message)
+        reader = DictReader(csv_stream)
+        
+        for row in reader:
+            self.channel.basic_publish(exchange=self.dst_exchange, routing_key=self.get_keys(row), body=dumps(row))
 
 
 def wait_rabbitmq():

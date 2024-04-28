@@ -12,9 +12,9 @@ def result(accumulator):
 def main():
     # Pending: move variables to env.
     rabbit_hostname = 'rabbitmq'
-    src_queue = 'top_90s_q'
-    src_exchange = '90s_rev_exch'
-    dst_exchange = 'output_exch'
+    src_queue = 'top_90s_queue'
+    src_exchange = '90s_rev_exchange'
+    dst_exchange = 'output_exchange'
     dst_routing_key = 'top_90s_books'
     accumulator = []
     worker = Aggregate(aggregate, result, accumulator, rabbit_hostname, src_queue, src_exchange, dst_exchange=dst_exchange, dst_routing_key=dst_routing_key)

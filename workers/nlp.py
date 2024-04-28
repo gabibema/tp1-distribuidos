@@ -9,9 +9,9 @@ def sentiment(message):
 def main():
     # Pending: move variables to env.
     rabbit_hostname = 'rabbitmq'
-    src_queue = 'fiction_rev_q'
-    src_exchange = 'fiction_rev_exch'
-    dst_exchange = 'nlp_revs_exch'
+    src_queue = 'fiction_rev_queue'
+    src_exchange = 'fiction_rev_exchange'
+    dst_exchange = 'nlp_revs_exchange'
     worker = Map(sentiment, rabbit_hostname, src_queue, src_exchange, dst_exchange=dst_exchange)
     worker.start()
 

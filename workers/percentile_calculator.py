@@ -55,9 +55,9 @@ def swap(buffer, i, j):
 def main():
     # Pending: move variables to env.
     rabbit_hostname = 'rabbitmq'
-    src_queue = 'avg_nlp_q'
-    src_exchange = 'avg_nlp_exch'
-    dst_exchange = 'nlp_percentile_exch'
+    src_queue = 'avg_nlp_queue'
+    src_exchange = 'avg_nlp_exchange'
+    dst_exchange = 'nlp_percentile_exchange'
     accumulator = []
     worker = Aggregate(aggregate, result, accumulator, rabbit_hostname, src_queue, src_exchange, dst_exchange=dst_exchange)
     worker.start()
