@@ -14,11 +14,11 @@ def main():
     # Pending: move variables to env.
     # Pending: update SHARD_COUNT variable to match the env.
     rabbit_hostname = 'rabbitmq'
-    src_queue = 'fiction_queue'
+    src_queue = '90s_queue'
     src_exchange = 'books_exchange'
-    src_routing_key = '#.fiction.#'
-    dst_exchange = 'fiction_books_sharded_exchange'
-    dst_routing_key = 'fiction_books'
+    src_routing_key = '#.1.9.9.*'
+    dst_exchange = '90s_books_sharded_exchange'
+    dst_routing_key = '90s_books'
     worker = Router(routing_fn, rabbit_hostname, src_queue, src_exchange, src_routing_key, ExchangeType.topic, dst_exchange, dst_routing_key)
     worker.start()
 

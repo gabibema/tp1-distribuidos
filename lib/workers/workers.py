@@ -85,6 +85,7 @@ class Router(Worker):
 
     def callback(self, ch, method, properties, body):
         'Callback given to a RabbitMQ queue to invoke for each message in the queue'
-        routing_key = self.routing_fn(body)
-        ch.basic_publish(exchange=self.dst_exchange, routing_key=routing_key, body=body)
+        routing_keys = self.routing_fn(body)
+        for routing_key in routing_keys:
+            ch.basic_publish(exchange=self.dst_exchange, routing_key=routing_key, body=body)
         ch.basic_ack(delivery_tag=method.delivery_tag)

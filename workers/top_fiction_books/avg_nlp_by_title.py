@@ -1,6 +1,6 @@
 import json
 from pika.exchange_type import ExchangeType
-from lib.workers import Aggregate
+from lib.workers import DynamicAggregate
 
 AvgAccumulator = namedtuple('AvgAccumulator', ['sum', 'count'])
 
@@ -16,11 +16,12 @@ def result(accumulator):
 def main():
     # Pending: move variables to env.
     rabbit_hostname = 'rabbitmq'
-    src_queue = 'nlp_revs_queue'
+    src_routing_key = f'nlp_revs_shard{shard_id}'
+    src_queue = src_routing_key + '_queue'
     src_exchange = 'nlp_revs_exchange'
     dst_exchange = 'avg_nlp_exchange'
     accumulator = {}
-    worker = Aggregate(aggregate, result, accumulator, rabbit_hostname, src_queue, src_exchange, dst_exchange=dst_exchange, dst_exchange_type=ExchangeType.fanout)
+    worker = DynamicAggregate(aggregate, result, accumulator, rabbit_hostname, src_queue, src_exchange, dst_exchange=dst_exchange, dst_routing_key='avg_nlp', dst_exchange_type=ExchangeType.topic)
     worker.start()
 
 if __name__ == '__main__':
