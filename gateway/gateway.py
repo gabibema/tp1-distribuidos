@@ -7,24 +7,24 @@ class Gateway:
         self.books_queue = config['books_queue']
         self.books_exchange = config['books_exchange']
 
-        self.ratings_queue = config['ratings_queue']
-        self.ratings_exchange = config['ratings_exchange']
+        self.reviews_queue = config['reviews_queue']
+        self.reviews_exchange = config['reviews_exchange']
 
         self.books_gateway = Thread(target=self.__gateway_books)
-        self.ratings_gateway = Thread(target=self.__gateway_ratings)
+        self.reviews_gateway = Thread(target=self.__gateway_reviews)
 
     def start(self):
         wait_rabbitmq()
         self.books_gateway.start()
-        self.ratings_gateway.start()
+        self.reviews_gateway.start()
     
     def __gateway_books(self):
         gateway = Proxy('rabbitmq', self.books_queue, self.books_exchange, keys_getter=get_books_keys)
         gateway.start()
     
         
-    def __gateway_ratings(self):
-        gateway = Proxy('rabbitmq', self.ratings_queue, self.ratings_exchange)
+    def __gateway_reviews(self):
+        gateway = Proxy('rabbitmq', self.reviews_queue, self.reviews_exchange)
         gateway.start()
 
 def get_books_keys(row):
