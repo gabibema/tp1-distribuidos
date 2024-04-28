@@ -13,7 +13,7 @@ MAX_KEY_LENGTH = 255
 
 class Worker(ABC):
 
-    def new(self, rabbit_hostname, src_queue='', src_exchange=None, src_routing_key=None, src_exchange_type=ExchangeType.direct, dst_exchange=None, dst_routing_key=None, dst_exchange_type=ExchangeType.direct, dst_queue=None):
+    def new(self, rabbit_hostname, src_queue='', src_exchange=None, src_routing_key=None, src_exchange_type=ExchangeType.direct, dst_exchange=None, dst_routing_key=None, dst_exchange_type=ExchangeType.direct):
         # init RabbitMQ channel
         connection = pika.BlockingConnection(pika.ConnectionParameters(host=rabbit_hostname))
         self.channel = connection.channel()
@@ -27,12 +27,11 @@ class Worker(ABC):
         # init destination exchange
         if dst_exchange:
             self.dst_exchange = dst_exchange
-            self.routing_key = dst_routing_key
             self.channel.exchange_declare(exchange=dst_exchange, exchange_type=dst_exchange_type)
 
-        if dst_queue:
-            self.dst_queue = dst_queue
-            self.channel.queue_declare(queue=dst_queue)
+        if dst_routing_key:
+            self.channel.queue_declare(queue=dst_routing_key)
+            self.routing_key = dst_routing_key
 
     def connect_to_peers(self):
         # set up control queues between workers that consume from the same queue
@@ -95,13 +94,13 @@ class Aggregate(Worker):
 
 class Sender(Worker):
     def __init__(self, rabbit_hostname, dst_queue):
-        self.new(rabbit_hostname, dst_queue=dst_queue)
+        self.new(rabbit_hostname, dst_routing_key=dst_queue)
     
     def callback(self, ch, method, properties, body):
         pass
 
     def publish(self, message):
-        self.channel.basic_publish(exchange='', routing_key=self.dst_queue, body=message)
+        self.channel.basic_publish(exchange='', routing_key=self.routing_key, body=message)
 
 class Proxy(Worker):
     def __init__(self, rabbit_hostname, src_queue, dst_exchange, keys_getter = None):
