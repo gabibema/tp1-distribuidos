@@ -54,7 +54,7 @@ def swap(buffer, i, j):
 
 def main():
     # Pending: move variables to env.
-    rabbit_hostname = 'localhost'
+    rabbit_hostname = 'rabbitmq'
     src_queue = 'avg_nlp_q'
     src_exchange = 'avg_nlp_exch'
     dst_exchange = 'nlp_percentile_exch'

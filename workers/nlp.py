@@ -8,7 +8,7 @@ def sentiment(message):
 
 def main():
     # Pending: move variables to env.
-    rabbit_hostname = 'localhost'
+    rabbit_hostname = 'rabbitmq'
     src_queue = 'fiction_rev_q'
     src_exchange = 'fiction_rev_exch'
     dst_exchange = 'nlp_revs_exch'

@@ -15,7 +15,7 @@ def result(accumulator):
 
 def main():
     # Pending: move variables to env.
-    rabbit_hostname = 'localhost'
+    rabbit_hostname = 'rabbitmq'
     src_queue = 'nlp_revs_q'
     src_exchange = 'nlp_revs_exch'
     dst_exchange = 'avg_nlp_exch'

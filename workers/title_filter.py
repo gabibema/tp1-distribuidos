@@ -10,9 +10,9 @@ def title_filter(message):
 
 def main():
     # Pending: move variables to env.
-    rabbit_hostname = 'localhost'
+    rabbit_hostname = 'rabbitmq'
     src_queue = 'computers_q'
-    src_exchange = 'books_exch'
+    src_exchange = 'books_exchange'
     src_routing_key = '#.computers.#'
     dst_exchange = 'output_exch'
     dst_routing_key = 'computer_books'
