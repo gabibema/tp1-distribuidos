@@ -1,3 +1,5 @@
+import json
+from pika.exchange_type import ExchangeType
 from lib.workers import Filter
 
 def title_filter(message):
