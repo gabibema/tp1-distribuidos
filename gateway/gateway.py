@@ -12,17 +12,12 @@ class Gateway:
         self.port = config['port']
         self.conn = None
 
-        self.books_queue = Queue()
-        self.reviews_queue = Queue()
-
-        #self.gateway_books = Thread(target=self.__gateway_file(config['books_exchange'], get_books_keys, MESSAGE_FLAG['BOOK']))
-        #self.gateway_reviews = Thread(target=self.__gateway_file(config['ratings_exchange'], None, MESSAGE_FLAG['RATING']))
-
+        self.books_exchange = config['books_exchange']
+        self.ratings_exchange = config['ratings_exchange']
 
     def start(self):
         self.__start_socket()
-        #self.gateway_books.start()
-        #self.gateway_reviews.start()
+
 
 
     def __start_socket(self):
@@ -37,31 +32,21 @@ class Gateway:
 
 
     def __handle_client(self, client):
+        wait_rabbitmq()
         protocol = TransferProtocol(client)
+        exchanges = {
+            self.books_exchange: None,
+            self.ratings_exchange: get_books_keys
+        }
+
+        proxy = Proxy('rabbitmq', exchanges)
+
         while True:
             message, flag = protocol.receive_message()
-            print(f"Received message: {message}")
-            #if flag == MESSAGE_FLAG['ERROR']:
-            #    client.close()
-            #elif flag == MESSAGE_FLAG['BOOK']:
-            #    self.books_queue.put(message)
-            #elif flag == MESSAGE_FLAG['RATING']:
-            #    self.reviews_queue.put(message, flag)
-
-
-    def __gateway_file(self, exchange, keys_getter=None, flag=None):
-        wait_rabbitmq()
-        proxy = Proxy('rabbitmq',exchange, keys_getter)
-        proxy.start()
-
-        if flag == MESSAGE_FLAG['BOOK']:
-            queue = self.books_queue
-        elif flag == MESSAGE_FLAG['RATING']:
-            queue = self.reviews_queue
-
-        while True:
-            message = queue.get()
-            proxy.publish(message)
+            if flag == MESSAGE_FLAG['BOOK']:
+                proxy.publish(message, self.books_exchange)
+            elif flag == MESSAGE_FLAG['RATING']:
+                proxy.publish(message, self.ratings_exchange)
 
 
 def get_books_keys(row):

@@ -46,5 +46,5 @@ class Client:
         while True:
             batch, flag = self.sender_queue.get()
             protocol.send_message('\n'.join(batch), flag)
-            
+
             
