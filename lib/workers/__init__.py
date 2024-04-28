@@ -1,7 +1,7 @@
-from .workers import Aggregate, Filter, Map
-from .gateway import Proxy, Sender, wait_rabbitmq
+from .workers import Aggregate, Filter, Map, Router
+from .dynamic_workers import DynamicRouter
 from .stateful_filter import StatefulFilter
-from .sharder import StatefulSharder
+from .gateway import Proxy, Sender, wait_rabbitmq
 
 MAX_KEY_LENGTH = 255
 
