@@ -1,8 +1,25 @@
-version: '3.13'
 services:
   rabbitmq:
-    build:
-      context: ./rabbitmq
-      dockerfile: rabbitmq.dockerfile
+    image: rabbitmq:latest
     ports:
       - 15672:15672
+  
+  title_filter:
+    image: title_filter:latest
+    entrypoint: python3 /app/main.py
+    depends_on:
+      - rabbitmq
+    links:
+      - rabbitmq
+
+  client:
+    image: client:latest
+    entrypoint: python3 /app/main.py
+    volumes:
+      - ./config/client.ini:/app/config.ini
+      - ./lib:/app/lib
+      - ./data:/app/data
+    depends_on:
+      - rabbitmq
+    links:
+      - rabbitmq
