@@ -4,7 +4,7 @@ import pika
 
 class Worker(ABC):
 
-    def new(self, rabbit_hostname, src_queue='', src_exchange=None, src_routing_key=None, src_exchange_type=ExchangeType.direct, dst_exchange=None, dst_routing_key=None, dst_exchange_type=ExchangeType.direct, tmp_queues=None):
+    def new(self, rabbit_hostname, src_queue='', src_exchange=None, src_routing_key=None, src_exchange_type=ExchangeType.direct, dst_exchange=None, dst_routing_key=None, dst_exchange_type=ExchangeType.direct):
         # init RabbitMQ channel
         connection = pika.BlockingConnection(pika.ConnectionParameters(host=rabbit_hostname))
         self.channel = connection.channel()

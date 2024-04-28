@@ -18,9 +18,9 @@ def main():
     # Pending: move variables to env.
     shard_id = 0
     rabbit_hostname = 'rabbitmq'
-    src_queue = ''
-    src_exchange = 'books_exchange'
-    src_routing_key = '#.fiction.#'
+    src_routing_key = f'fiction_books_shard{shard_id}'
+    src_queue = src_routing_key + '_queue'
+    src_exchange = 'fiction_books_sharded_exchange'
     dst_exchange = 'fiction_titles_barrier_exchange'
     dst_routing_key = f'fiction_titles_shard{shard_id}'
     accumulator = []
