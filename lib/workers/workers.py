@@ -9,7 +9,6 @@ from pika.exchange_type import ExchangeType
 import pika
 
 WAIT_TIME_PIKA = 15
-MAX_KEY_LENGTH = 255
 
 class Worker(ABC):
 
