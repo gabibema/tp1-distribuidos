@@ -1,5 +1,6 @@
 import json
 import random
+from pika.exchange_type import ExchangeType
 from lib.workers import Aggregate
 
 def aggregate(message, accumulator):
@@ -59,7 +60,7 @@ def main():
     src_exchange = 'avg_nlp_exchange'
     dst_exchange = 'nlp_percentile_exchange'
     accumulator = []
-    worker = Aggregate(aggregate, result, accumulator, rabbit_hostname, src_queue, src_exchange, dst_exchange=dst_exchange)
+    worker = Aggregate(aggregate, result, accumulator, rabbit_hostname, src_queue, src_exchange, src_exchange_type=ExchangeType.topic, src_routing_key='#', dst_exchange=dst_exchange)
     worker.start()
 
 if __name__ == '__main__':
