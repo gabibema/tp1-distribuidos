@@ -1,4 +1,5 @@
-from socket import SOCK_STREAM, socket
+from queue import Queue
+from socket import SOCK_STREAM, socket, AF_INET, create_connection
 from threading import Thread
 from lib.transfer.transfer_protocol import MESSAGE_FLAG, TransferProtocol
 
@@ -6,28 +7,27 @@ BATCH_AMOUNT = 200
 
 class Client:
     def __init__(self, config):
-        self.books_path = config['books_path']
-        self.ratings_path = config['ratings_path']
-        
         self.port = config['port']
         self.conn = None
+        
+        self.books_path = config['books_path']
+        self.ratings_path = config['ratings_path']
 
-        self.books_sender = Thread(target=self.__send_books)
-        self.ratings_sender = Thread(target=self.__send_ratings)
+        self.sender_queue = Queue()
+        self.file_sender = Thread(target=self.__send_files)
+        self.books_reader = Thread(target=self.__read_file(MESSAGE_FLAG['BOOK']))
+        self.ratings_reader = Thread(target=self.__read_file(MESSAGE_FLAG['RATING']))
 
     def start(self):
         self.__start_socket()
-        self.books_sender.start()
-        self.ratings_sender.start()
+        self.file_sender.start()
+        self.books_reader.start()
+        self.ratings_reader.start()
         
     def __start_socket(self):
-        self.conn = socket(SOCK_STREAM)
-        self.conn.connect(('', self.port))
+        self.conn = create_connection(('gateway', self.port))
 
-        
-    def __send_books(self):
-        protocol = TransferProtocol(self.conn)
-
+    def __read_file(self, flag):
         with open(self.books_path, 'r') as file:
             headers = file.readline().strip()
             batch = [headers]
@@ -35,24 +35,16 @@ class Client:
             for line in file:
                 batch.append(line.strip())
                 if len(batch) >= BATCH_AMOUNT:
-                    protocol.send_message('\n'.join(batch), MESSAGE_FLAG['BOOK'])
+                    self.sender_queue.put((batch, flag))
                     batch = [headers]
+                    
             if batch:            
-                protocol.publish('\n'.join(batch), MESSAGE_FLAG['BOOK']) 
-
-
-    def __send_ratings(self):
-
+                self.sender_queue.put((batch, flag))
+        
+    def __send_files(self):
         protocol = TransferProtocol(self.conn)
-        with open(self.ratings_path, 'r') as file:
-            headers = file.readline().strip()
-            batch = [headers]
-
-            for line in file:
-                batch.append(line.strip())
-                if len(batch) >= BATCH_AMOUNT:
-                    protocol.send_message('\n'.join(batch), MESSAGE_FLAG['RATING'])
-                    batch = [headers]
-            if batch:            
-                protocol.publish('\n'.join(batch), MESSAGE_FLAG['RATING'])
-
+        while True:
+            batch, flag = self.sender_queue.get()
+            protocol.send_message('\n'.join(batch), flag)
+            
+            

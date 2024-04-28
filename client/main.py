@@ -10,9 +10,8 @@ def get_config_params():
     try:
         config_params = {
             'books_path': os.getenv('BOOKS_PATH', default=config['DEFAULT'].get('BOOKS_PATH')),
-            'books_queue': os.getenv('BOOKS_QUEUES', default=config['DEFAULT'].get('BOOKS_QUEUES')),
             'ratings_path': os.getenv('RATINGS_PATH', default=config['DEFAULT'].get('RATINGS_PATH')),
-            'ratings_queue': os.getenv('RATINGS_QUEUES', default=config['DEFAULT'].get('RATINGS_QUEUES')),
+            'port': int(os.getenv('PORT', default=config['DEFAULT'].get('PORT'))),
             'log_level': os.getenv('LOG_LEVEL', default=config['DEFAULT'].get('LOG_LEVEL')),
         }
         print(config_params)

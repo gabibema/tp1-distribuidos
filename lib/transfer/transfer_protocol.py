@@ -1,5 +1,6 @@
 from socket import socket
 import logging
+from typing import Tuple
 
 MESSAGE_FLAG = {
     'BOOK': '1',
@@ -32,7 +33,7 @@ class TransferProtocol:
         return total_sent
 
 
-    def read_header(self) -> tuple[str, str, str]:
+    def __read_header(self) -> Tuple[str,str,str]:
         """
         Reads both the initial and final header of a message from a socket in 16-byte blocks,
         ensuring that two delimiters are received to complete the header.
@@ -55,7 +56,7 @@ class TransferProtocol:
 
 
 
-    def receive_message(self) -> tuple[str,str]:
+    def receive_message(self) -> Tuple[str,str]:
         """
         Receives a message from a socket avoiding short reads
         """

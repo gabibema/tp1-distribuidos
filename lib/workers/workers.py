@@ -101,16 +101,18 @@ class Sender(Worker):
         self.channel.basic_publish(exchange='', routing_key=self.routing_key, body=message)
 
 class Proxy(Worker):
-    def __init__(self, rabbit_hostname, src_queue, dst_exchange, keys_getter = None):
+    def __init__(self, rabbit_hostname, dst_exchange, keys_getter = None):
         self.get_keys = keys_getter if keys_getter is not None else lambda x: ""
-        self.new(rabbit_hostname, src_queue=src_queue, dst_exchange=dst_exchange)
+        self.new(rabbit_hostname, dst_exchange=dst_exchange)
 
     def publish(self, message):
         message = message.decode('utf-8')
         csv_stream = StringIO(message)
         reader = DictReader(csv_stream)
+
         
         for row in reader:
+            print(self.get_keys(row))
             self.channel.basic_publish(exchange=self.dst_exchange, routing_key=self.get_keys(row), body=dumps(row))
 
 
