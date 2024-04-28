@@ -105,15 +105,17 @@ class Proxy(Worker):
         self.get_keys = keys_getter if keys_getter is not None else lambda x: ""
         self.new(rabbit_hostname, src_queue=src_queue, dst_exchange=dst_exchange)
 
-    def callback(self, ch, method, properties, body: bytes):
-        'Callback given to a RabbitMQ queue to invoke for each message in the queue'
-        message = body.decode('utf-8')
+    def publish(self, message):
+        message = message.decode('utf-8')
         csv_stream = StringIO(message)
         reader = DictReader(csv_stream)
         
         for row in reader:
             self.channel.basic_publish(exchange=self.dst_exchange, routing_key=self.get_keys(row), body=dumps(row))
 
+
+    def callback(self, ch, method, properties, body: bytes):
+        pass
 
 def wait_rabbitmq():
     """Pauses execution for few seconds in order start rabbitmq broker."""
