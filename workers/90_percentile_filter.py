@@ -21,7 +21,7 @@ def main():
     rabbit_hostname = 'rabbitmq'
     src_exchange = 'nlp_percentile_exchange'
     dst_exchange = 'output_exchange'
-    worker =  StatefulFilter(update_state, filter_condition, rabbit_hostname, src_exchange=src_exchange, dst_exchange=dst_exchange, dst_routing_key='fiction_top_90_percentile')
+    worker = StatefulFilter(update_state, filter_condition, rabbit_hostname, src_exchange=src_exchange, dst_exchange=dst_exchange, dst_routing_key='fiction_top_90_percentile')
     worker.start()
 
 if __name__ == '__main__':
