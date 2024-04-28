@@ -13,19 +13,23 @@ MAX_KEY_LENGTH = 255
 
 class Worker(ABC):
 
-    def new(self, rabbit_hostname, src_queue, src_exchange='', src_routing_key=None, src_exchange_type=ExchangeType.direct, dst_exchange='', dst_routing_key=None, dst_exchange_type=ExchangeType.direct):
+    def new(self, rabbit_hostname, src_queue='', src_exchange=None, src_routing_key=None, src_exchange_type=ExchangeType.direct, dst_exchange=None, dst_routing_key=None, dst_exchange_type=ExchangeType.direct):
         # init RabbitMQ channel
         connection = pika.BlockingConnection(pika.ConnectionParameters(host=rabbit_hostname))
         self.channel = connection.channel()
         # init source queue and bind to exchange
         self.channel.queue_declare(queue=src_queue)
         self.channel.basic_consume(queue=src_queue, on_message_callback=self.callback)
-        self.channel.exchange_declare(src_exchange, exchange_type=src_exchange_type)
-        self.channel.queue_bind(src_queue, src_exchange, routing_key=src_routing_key)
+
+        if src_exchange:
+            self.channel.exchange_declare(src_exchange, exchange_type=src_exchange_type)
+            self.channel.queue_bind(src_queue, src_exchange, routing_key=src_routing_key)
         # init destination exchange
-        self.dst_exchange = dst_exchange
+        if dst_exchange:
+            self.dst_exchange = dst_exchange
+            self.channel.exchange_declare(exchange=dst_exchange, exchange_type=dst_exchange_type)
+
         self.routing_key = dst_routing_key
-        self.channel.exchange_declare(exchange=dst_exchange, exchange_type=dst_exchange_type)
 
     def connect_to_peers(self):
         # set up control queues between workers that consume from the same queue
@@ -88,30 +92,28 @@ class Aggregate(Worker):
 
 class Sender(Worker):
     def __init__(self, rabbit_hostname, dst_queue):
-        self.new(rabbit_hostname, '', dst_queue)
+        self.new(rabbit_hostname, dst_routing_key=dst_queue)
+        self.channel.queue_declare(queue=dst_queue)
     
     def callback(self, ch, method, properties, body):
         pass
 
     def publish(self, message):
-        self.channel.basic_publish(exchange='', routing_key=self.dst_queue, body=message)
+        self.channel.basic_publish(exchange='', routing_key=self.routing_key, body=message)
 
 class Proxy(Worker):
-    def __init__(self, rabbit_hostname, src_queue, exchange, exchange_type='direct', keys_getter = None):
+    def __init__(self, rabbit_hostname, src_queue, dst_exchange, keys_getter = None):
         self.get_keys = keys_getter if keys_getter is not None else lambda x: ""
-        self.new(rabbit_hostname, src_queue=src_queue, exchange=exchange, exchange_type=exchange_type)
+        self.new(rabbit_hostname, src_queue=src_queue, dst_exchange=dst_exchange)
 
     def callback(self, ch, method, properties, body: bytes):
         'Callback given to a RabbitMQ queue to invoke for each message in the queue'
-        message = body.decode('utf-8').split('\n')
-        headers = message.pop(0).split(',')
-
-        for row in message:
-            csv_file = StringIO(row)
-            reader = DictReader(csv_file, fieldnames=headers)
-            for row in reader:
-                self.channel.basic_publish(exchange=self.dst_queue, routing_key=self.get_keys(row), body=dumps(row))
-
+        message = body.decode('utf-8')
+        csv_stream = StringIO(message)
+        reader = DictReader(csv_stream)
+        
+        for row in reader:
+            self.channel.basic_publish(exchange=self.dst_exchange, routing_key=self.get_keys(row), body=dumps(row))
 
 
 def wait_rabbitmq():

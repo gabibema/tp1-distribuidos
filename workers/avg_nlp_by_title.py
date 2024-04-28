@@ -15,10 +15,10 @@ def result(accumulator):
 
 def main():
     # Pending: move variables to env.
-    rabbit_hostname = 'localhost'
-    src_queue = 'nlp_revs_q'
-    src_exchange = 'nlp_revs_exch'
-    dst_exchange = 'avg_nlp_exch'
+    rabbit_hostname = 'rabbitmq'
+    src_queue = 'nlp_revs_queue'
+    src_exchange = 'nlp_revs_exchange'
+    dst_exchange = 'avg_nlp_exchange'
     accumulator = {}
     worker = Aggregate(aggregate, result, accumulator, rabbit_hostname, src_queue, src_exchange, dst_exchange=dst_exchange, dst_exchange_type=ExchangeType.fanout)
     worker.start()
