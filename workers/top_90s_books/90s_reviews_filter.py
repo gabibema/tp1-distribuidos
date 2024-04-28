@@ -18,12 +18,12 @@ def main():
     # Pending: move variables to env.
     shard_id = 0
     rabbit_hostname = 'rabbitmq'
-    src_queue=f'fiction_titles_shard{shard_id}_queue'
-    src_exchange = 'fiction_titles_barrier_exchange'
-    src_routing_key = f'fiction_titles_shard{shard_id}'
-    dst_exchange = 'fiction_rev_exchange'
-    tmp_queues_prefix = f'fiction_reviews_shard{shard_id}'
-    worker = StatefulFilter(update_state, filter_condition, tmp_queues_prefix, rabbit_hostname, src_queue, src_exchange, src_routing_key, ExchangeType.direct, dst_exchange, 'fiction_rev_queue')
+    src_queue=f'90s_titles_shard{shard_id}_queue'
+    src_exchange = '90s_titles_barrier_exchange'
+    src_routing_key = f'90s_titles_shard{shard_id}'
+    dst_exchange = '90s_rev_exchange'
+    tmp_queues_prefix = f'90s_reviews_shard{shard_id}'
+    worker = StatefulFilter(update_state, filter_condition, tmp_queues_prefix, rabbit_hostname, src_queue, src_exchange, src_routing_key, ExchangeType.direct, dst_exchange, '90s_rev_queue')
     worker.start()
 
 if __name__ == '__main__':
