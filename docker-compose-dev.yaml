@@ -3,14 +3,15 @@ services:
     image: rabbitmq:latest
     ports:
       - 15672:15672
-  
-  title_filter:
-    image: title_filter:latest
+
+  gateway:
+    image: gateway:latest
     entrypoint: python3 /app/main.py
     depends_on:
       - rabbitmq
     links:
       - rabbitmq
+
 
   client:
     image: client:latest
