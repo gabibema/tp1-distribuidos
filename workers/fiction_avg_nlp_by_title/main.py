@@ -16,6 +16,7 @@ def result(accumulator):
 def main():
     # Pending: move variables to env.
     rabbit_hostname = 'rabbitmq'
+    shard_id = 0
     src_routing_key = f'nlp_revs_shard{shard_id}'
     src_queue = src_routing_key + '_queue'
     src_exchange = 'nlp_revs_exchange'

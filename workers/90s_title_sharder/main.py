@@ -13,6 +13,7 @@ def routing_fn(body):
 def main():
     # Pending: move variables to env.
     # Pending: update SHARD_COUNT variable to match the env.
+    SHARD_COUNT = 1
     rabbit_hostname = 'rabbitmq'
     src_queue = '90s_queue'
     src_exchange = 'books_exchange'
