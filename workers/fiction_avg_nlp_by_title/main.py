@@ -1,4 +1,5 @@
 import json
+from collections import namedtuple
 from pika.exchange_type import ExchangeType
 from lib.workers import DynamicAggregate
 
@@ -21,8 +22,9 @@ def main():
     src_queue = src_routing_key + '_queue'
     src_exchange = 'nlp_revs_exchange'
     dst_exchange = 'avg_nlp_exchange'
+    tmp_queues = [('avg_nlp','')]
     accumulator = {}
-    worker = DynamicAggregate(aggregate, result, accumulator, rabbit_hostname, src_queue, src_exchange, dst_exchange=dst_exchange, dst_routing_key='avg_nlp', dst_exchange_type=ExchangeType.topic)
+    worker = DynamicAggregate(aggregate, result, accumulator, tmp_queues, rabbit_hostname, src_queue, src_exchange, dst_exchange=dst_exchange, dst_routing_key='avg_nlp', dst_exchange_type=ExchangeType.topic)
     worker.start()
 
 if __name__ == '__main__':

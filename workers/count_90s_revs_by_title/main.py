@@ -13,9 +13,9 @@ def main():
     rabbit_hostname = 'rabbitmq'
     src_queue = '90s_rev_queue'
     src_exchange = '90s_rev_exchange'
-    dst_exchange = 'top_90s_exchange'
+    dst_routing_key = 'top_90s_queue'
     accumulator = {}
-    worker = Aggregate(aggregate, result, accumulator, rabbit_hostname, src_queue, src_exchange, dst_exchange=dst_exchange)
+    worker = Aggregate(aggregate, result, accumulator, rabbit_hostname, src_queue, src_exchange, dst_routing_key=dst_routing_key)
     worker.start()
 
 if __name__ == '__main__':

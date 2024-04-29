@@ -1,5 +1,5 @@
 import json
-from lib.runner import Aggregate
+from lib.workers import Aggregate
 
 def aggregate(message, accumulator):
     msg = json.loads(message)
@@ -24,7 +24,7 @@ def main():
     dst_exchange = 'fiction_titles_barrier_exchange'
     dst_routing_key = f'fiction_titles_shard{shard_id}'
     accumulator = []
-    worker = Aggregate(aggregate, result, accumulator, rabbit_hostname, src_queue, src_exchange, src_routing_key, ExchangeType.topic, dst_exchange, dst_routing_key)
+    worker = Aggregate(aggregate, result, accumulator, rabbit_hostname, src_queue, src_exchange, src_routing_key, dst_exchange=dst_exchange, dst_routing_key=dst_routing_key)
     worker.start()
 
 if __name__ == '__main__':

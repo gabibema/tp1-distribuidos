@@ -7,7 +7,7 @@ def routing_fn(body):
     "Shard by title and route to request specific tmp queues"
     msg = json.loads(body)
     shard_id = hash(msg['Title']) % SHARD_COUNT
-    routing_key = f"{self.routing_key}_shard{shard_id}"
+    routing_key = f"fiction_books_shard{shard_id}"
     return [routing_key]
 
 def main():

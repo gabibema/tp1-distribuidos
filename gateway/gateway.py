@@ -1,10 +1,9 @@
-
 from queue import Queue
 from threading import Thread
-from lib.workers.workers import Proxy
-from lib.workers import wait_rabbitmq, MAX_KEY_LENGTH
-from lib.transfer.transfer_protocol import MESSAGE_FLAG, TransferProtocol
 from socket import SOCK_STREAM, socket, AF_INET
+from pika.exchange_type import ExchangeType
+from lib.workers import Proxy, wait_rabbitmq, MAX_KEY_LENGTH
+from lib.transfer.transfer_protocol import MESSAGE_FLAG, TransferProtocol
 
 
 class Gateway:
@@ -17,7 +16,6 @@ class Gateway:
 
     def start(self):
         self.__start_socket()
-
 
 
     def __start_socket(self):
@@ -35,18 +33,19 @@ class Gateway:
         wait_rabbitmq()
         protocol = TransferProtocol(client)
         exchanges = {
-            self.books_exchange: None,
-            self.ratings_exchange: get_books_keys
+            'books_exchange': None,
+            'reviews_exchange': get_books_keys
         }
-
         proxy = Proxy('rabbitmq', exchanges)
+        proxy.channel.exchange_declare('books_exchange', exchange_type=ExchangeType.topic)
+        proxy.channel.exchange_declare('reviews_exchange', exchange_type=ExchangeType.direct)
 
         while True:
             message, flag = protocol.receive_message()
             if flag == MESSAGE_FLAG['BOOK']:
-                proxy.publish(message, self.books_exchange)
+                proxy.publish(message, 'books_exchange')
             elif flag == MESSAGE_FLAG['RATING']:
-                proxy.publish(message, self.ratings_exchange)
+                proxy.publish(message, 'reviews_exchange')
 
 
 def get_books_keys(row):

@@ -1,5 +1,6 @@
 import json
-from lib.workers import StatefulFilter
+from pika.exchange_type import ExchangeType
+from lib.workers import DynamicFilter
 
 def update_state(old_state, message):
     if message['type'] == 'new_request':
@@ -23,7 +24,7 @@ def main():
     src_exchange = '90s_titles_barrier_exchange'
     dst_exchange = '90s_rev_exchange'
     tmp_queues_prefix = f'90s_reviews_shard{shard_id}'
-    worker = StatefulFilter(update_state, filter_condition, tmp_queues_prefix, rabbit_hostname, src_queue, src_exchange, src_routing_key, ExchangeType.direct, dst_exchange, '90s_rev_queue')
+    worker = DynamicFilter(update_state, filter_condition, tmp_queues_prefix, rabbit_hostname, src_queue, src_exchange, src_routing_key, ExchangeType.direct, dst_exchange, '90s_rev_queue')
     worker.start()
 
 if __name__ == '__main__':

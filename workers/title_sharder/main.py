@@ -13,10 +13,10 @@ def main():
     # Pending: move variables to env.
     # Pending: update SHARD_COUNT variable to match the env.
     rabbit_hostname = 'rabbitmq'
-    src_exchange = 'reviews_exchange'
+    src_queue = 'reviews_queue'
     dst_exchange = 'reviews_sharded_exchange'
     tmp_queues = [('fiction_reviews', 'reviews'),('90s_reviews','reviews')]
-    worker = DynamicRouter(routing_fn, tmp_queues, rabbit_hostname, src_exchange=src_exchange, dst_exchange=dst_exchange)
+    worker = DynamicRouter(routing_fn, tmp_queues, rabbit_hostname, src_queue, dst_exchange=dst_exchange)
     worker.start()
 
 if __name__ == '__main__':

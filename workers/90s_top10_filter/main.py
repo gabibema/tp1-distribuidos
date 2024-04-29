@@ -1,6 +1,6 @@
 import json
 from heapq import nlargest
-from lib.runner import Aggregate
+from lib.workers import Aggregate
 
 def aggregate(message, accumulator):
     msg = json.loads(message)
@@ -13,11 +13,9 @@ def main():
     # Pending: move variables to env.
     rabbit_hostname = 'rabbitmq'
     src_queue = 'top_90s_queue'
-    src_exchange = '90s_rev_exchange'
-    dst_exchange = 'output_exchange'
     dst_routing_key = 'top_90s_books'
     accumulator = []
-    worker = Aggregate(aggregate, result, accumulator, rabbit_hostname, src_queue, src_exchange, dst_exchange=dst_exchange, dst_routing_key=dst_routing_key)
+    worker = Aggregate(aggregate, result, accumulator, rabbit_hostname, src_queue, dst_routing_key=dst_routing_key)
     worker.start()
 
 if __name__ == '__main__':

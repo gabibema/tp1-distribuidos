@@ -73,7 +73,6 @@ def get_environment_config(subdirectory, index):
 def generate_initial_content():
     """ Generates the initial static content for the docker-compose file. """
     return """
-version: '3.8'
 services:
   rabbitmq:
     image: rabbitmq:latest

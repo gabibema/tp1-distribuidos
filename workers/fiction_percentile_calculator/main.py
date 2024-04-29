@@ -59,8 +59,9 @@ def main():
     src_queue = 'avg_nlp_queue'
     src_exchange = 'avg_nlp_exchange'
     dst_exchange = 'nlp_percentile_exchange'
+    dst_routing_key = 'nlp_percentile_queue'
     accumulator = []
-    worker = Aggregate(aggregate, result, accumulator, rabbit_hostname, src_queue, src_exchange, src_exchange_type=ExchangeType.topic, src_routing_key='#', dst_exchange=dst_exchange)
+    worker = Aggregate(aggregate, result, accumulator, rabbit_hostname, src_queue, src_exchange, src_exchange_type=ExchangeType.topic, src_routing_key='#', dst_exchange=dst_exchange, dst_routing_key=dst_routing_key)
     worker.start()
 
 if __name__ == '__main__':

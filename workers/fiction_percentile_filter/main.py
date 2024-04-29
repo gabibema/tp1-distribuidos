@@ -1,7 +1,7 @@
 import json
 import random
 from pika.exchange_type import ExchangeType
-from lib.workers import StatefulFilter
+from lib.workers import DynamicFilter
 
 def update_state(old_state, message):
     if message['type'] == 'new_request':
@@ -20,9 +20,11 @@ def main():
     # Pending: move variables to env.
     rabbit_hostname = 'rabbitmq'
     src_exchange = 'nlp_percentile_exchange'
-    dst_exchange = 'output_exchange'
+    src_queue = 'nlp_percentile_queue'
+    src_routing_key = 'nlp_percentile_queue'
+    dst_routing_key = 'top_fiction_books'
     tmp_queues_prefix = 'avg_nlp'
-    worker = StatefulFilter(update_state, filter_condition, tmp_queues_prefix, rabbit_hostname, src_exchange=src_exchange, dst_exchange=dst_exchange, dst_routing_key='top_fiction_books')
+    worker = DynamicFilter(update_state, filter_condition, tmp_queues_prefix, rabbit_hostname, src_queue, src_exchange, dst_routing_key=dst_routing_key)
     worker.start()
 
 if __name__ == '__main__':
