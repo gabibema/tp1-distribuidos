@@ -6,6 +6,7 @@ from lib.workers import Proxy, wait_rabbitmq, MAX_KEY_LENGTH
 from lib.transfer.transfer_protocol import MESSAGE_FLAG, TransferProtocol
 
 
+
 class Gateway:
     def __init__(self, config):
         self.port = config['port']

@@ -2,6 +2,7 @@ from queue import Queue
 from socket import SOCK_STREAM, socket, AF_INET, create_connection
 from threading import Thread
 from lib.transfer.transfer_protocol import MESSAGE_FLAG, TransferProtocol
+from uuid import uuid4
 
 BATCH_AMOUNT = 200
 
@@ -13,6 +14,7 @@ class Client:
         self.books_path = config['books_path']
         self.ratings_path = config['ratings_path']
 
+        self.uid = str(uuid4())
         self.sender_queue = Queue()
         self.file_sender = Thread(target=self.__send_files)
         self.books_reader = Thread(target=self.__read_file(MESSAGE_FLAG['BOOK']))
@@ -23,20 +25,20 @@ class Client:
         self.file_sender.start()
         self.books_reader.start()
         self.ratings_reader.start()
-        
+
     def __start_socket(self):
         self.conn = create_connection(('gateway', self.port))
 
     def __read_file(self, flag):
         with open(self.books_path, 'r') as file:
             headers = file.readline().strip()
-            batch = [headers]
+            batch = [self.uid,headers]
 
             for line in file:
                 batch.append(line.strip())
                 if len(batch) >= BATCH_AMOUNT:
                     self.sender_queue.put((batch, flag))
-                    batch = [headers]
+                    batch = [self.uid,headers]
                     
             if batch:            
                 self.sender_queue.put((batch, flag))

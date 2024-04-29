@@ -21,9 +21,11 @@ class Proxy(Worker):
 
     def publish(self, message, exchange):
         csv_stream = StringIO(message)
+        uid = csv_stream.readline().strip()
         reader = DictReader(csv_stream)
 
         for row in reader:
+            row['request_id'] = uid
             keys = self.get_keys(row, exchange)
             self.channel.basic_publish(exchange=exchange, routing_key=keys, body=dumps(row))
 

@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from time import sleep
+from time import sleep, time
 from pika.exchange_type import ExchangeType
 import pika
 
@@ -94,9 +94,21 @@ class Router(Worker):
             ch.basic_publish(exchange=self.dst_exchange, routing_key=routing_key, body=body)
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
-def wait_rabbitmq():
-    """Pauses execution for few seconds in order start rabbitmq broker."""
-    # this needs to be moved to the docker compose as a readiness probe
-    # we should first create rabbit, then workers, and finally start sending messages
-    sleep(WAIT_TIME_PIKA)
+
+def wait_rabbitmq(host='rabbitmq', timeout=120, interval=5):
+    """
+    Waits for RabbitMQ to be available.
+    """
+    start_time = time()
+    
+    while time() - start_time < timeout:
+        try:
+            connection = pika.BlockingConnection(pika.ConnectionParameters(host=host))
+            connection.close()
+            return
+        except pika.exceptions.AMQPConnectionError:
+            sleep(interval)
+
+    raise TimeoutError("RabbitMQ did not become available within the timeout period.")
+
 
