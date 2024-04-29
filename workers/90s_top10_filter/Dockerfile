@@ -1,5 +1,5 @@
 
 FROM rabbitmq-python-base
 WORKDIR /app
-COPY ./workers/count_rev_by_title /app
+COPY ./workers/90s_top10_filter /app
 COPY ./lib /app/lib

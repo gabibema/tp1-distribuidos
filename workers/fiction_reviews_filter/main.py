@@ -22,8 +22,9 @@ def main():
     src_exchange = 'fiction_titles_barrier_exchange'
     src_routing_key = f'fiction_titles_shard{shard_id}'
     dst_exchange = 'fiction_rev_exchange'
-    tmp_queues_prefix = f'reviews_shard{shard_id}'
-    worker = StatefulFilter(update_state, filter_condition, tmp_queues_prefix, rabbit_hostname, src_queue, src_exchange, src_routing_key, ExchangeType.direct, dst_exchange, 'fiction_rev_queue')
+    dst_routing_key = f'fiction_rev_shard{shard_id}'
+    tmp_queues_prefix = f'fiction_reviews_shard{shard_id}'
+    worker = StatefulFilter(update_state, filter_condition, tmp_queues_prefix, rabbit_hostname, src_queue, src_exchange, src_routing_key, ExchangeType.direct, dst_exchange, dst_routing_key)
     worker.start()
 
 if __name__ == '__main__':

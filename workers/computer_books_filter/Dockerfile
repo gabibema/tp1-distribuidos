@@ -1,5 +1,5 @@
 
 FROM rabbitmq-python-base
 WORKDIR /app
-COPY ./workers/top_fiction_books /app
+COPY ./workers/computer_books_filter /app
 COPY ./lib /app/lib
