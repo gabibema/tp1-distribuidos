@@ -1,9 +1,21 @@
+
+version: '3.8'
 services:
   rabbitmq:
     image: rabbitmq:latest
     ports:
       - 15672:15672
-
+  client:
+    image: client:latest
+    entrypoint: python3 /app/main.py
+    volumes:
+      - ./config/client.ini:/app/config.ini
+      - ./lib:/app/lib
+      - ./data:/app/data
+    depends_on:
+      - rabbitmq
+    links:
+      - rabbitmq
   gateway:
     image: gateway:latest
     entrypoint: python3 /app/main.py
@@ -12,14 +24,193 @@ services:
     links:
       - rabbitmq
 
-
-  client:
-    image: client:latest
+  90_percentile_filter:
+    container_name: 90_percentile_filter
+    image: 90_percentile_filter:latest
     entrypoint: python3 /app/main.py
-    volumes:
-      - ./config/client.ini:/app/config.ini
-      - ./lib:/app/lib
-      - ./data:/app/data
+    depends_on:
+      - rabbitmq
+    links:
+      - rabbitmq
+
+  author_decades:
+    container_name: author_decades
+    image: author_decades:latest
+    entrypoint: python3 /app/main.py
+    depends_on:
+      - rabbitmq
+    links:
+      - rabbitmq
+
+  avg_nlp_by_title:
+    container_name: avg_nlp_by_title
+    image: avg_nlp_by_title:latest
+    entrypoint: python3 /app/main.py
+    depends_on:
+      - rabbitmq
+    links:
+      - rabbitmq
+
+  computer_books:
+    container_name: computer_books
+    image: computer_books:latest
+    entrypoint: python3 /app/main.py
+    depends_on:
+      - rabbitmq
+    links:
+      - rabbitmq
+
+  count_rev_by_title:
+    container_name: count_rev_by_title
+    image: count_rev_by_title:latest
+    entrypoint: python3 /app/main.py
+    depends_on:
+      - rabbitmq
+    links:
+      - rabbitmq
+
+  fiction_reviews_filter1:
+    container_name: fiction_reviews_filter1
+    image: fiction_reviews_filter:latest
+    entrypoint: python3 /app/main.py
+    depends_on:
+      - rabbitmq
+    links:
+      - rabbitmq
+    environment:
+      SHARD_ID: "1"
+      RABBIT_HOSTNAME: "rabbitmq"
+      SRC_QUEUE: "fiction_titles_shard1_queue"
+      SRC_EXCHANGE: "fiction_titles_barrier_exchange"
+      SRC_ROUTING_KEY: "fiction_titles_shard1"
+      DST_EXCHANGE: "fiction_rev_exchange"
+      TMP_QUEUES_PREFIX: "reviews_shard1"
+
+
+  fiction_reviews_filter2:
+    container_name: fiction_reviews_filter2
+    image: fiction_reviews_filter:latest
+    entrypoint: python3 /app/main.py
+    depends_on:
+      - rabbitmq
+    links:
+      - rabbitmq
+    environment:
+      SHARD_ID: "2"
+      RABBIT_HOSTNAME: "rabbitmq"
+      SRC_QUEUE: "fiction_titles_shard2_queue"
+      SRC_EXCHANGE: "fiction_titles_barrier_exchange"
+      SRC_ROUTING_KEY: "fiction_titles_shard2"
+      DST_EXCHANGE: "fiction_rev_exchange"
+      TMP_QUEUES_PREFIX: "reviews_shard2"
+
+
+  fiction_reviews_filter3:
+    container_name: fiction_reviews_filter3
+    image: fiction_reviews_filter:latest
+    entrypoint: python3 /app/main.py
+    depends_on:
+      - rabbitmq
+    links:
+      - rabbitmq
+    environment:
+      SHARD_ID: "3"
+      RABBIT_HOSTNAME: "rabbitmq"
+      SRC_QUEUE: "fiction_titles_shard3_queue"
+      SRC_EXCHANGE: "fiction_titles_barrier_exchange"
+      SRC_ROUTING_KEY: "fiction_titles_shard3"
+      DST_EXCHANGE: "fiction_rev_exchange"
+      TMP_QUEUES_PREFIX: "reviews_shard3"
+
+
+  fiction_reviews_filter4:
+    container_name: fiction_reviews_filter4
+    image: fiction_reviews_filter:latest
+    entrypoint: python3 /app/main.py
+    depends_on:
+      - rabbitmq
+    links:
+      - rabbitmq
+    environment:
+      SHARD_ID: "4"
+      RABBIT_HOSTNAME: "rabbitmq"
+      SRC_QUEUE: "fiction_titles_shard4_queue"
+      SRC_EXCHANGE: "fiction_titles_barrier_exchange"
+      SRC_ROUTING_KEY: "fiction_titles_shard4"
+      DST_EXCHANGE: "fiction_rev_exchange"
+      TMP_QUEUES_PREFIX: "reviews_shard4"
+
+
+  fiction_title_barrier1:
+    container_name: fiction_title_barrier1
+    image: fiction_title_barrier:latest
+    entrypoint: python3 /app/main.py
+    depends_on:
+      - rabbitmq
+    links:
+      - rabbitmq
+    environment:
+      SHARD_ID: "1"
+      DST_ROUTING_KEY: "fiction_titles_shard1"
+
+
+  fiction_title_barrier2:
+    container_name: fiction_title_barrier2
+    image: fiction_title_barrier:latest
+    entrypoint: python3 /app/main.py
+    depends_on:
+      - rabbitmq
+    links:
+      - rabbitmq
+    environment:
+      SHARD_ID: "2"
+      DST_ROUTING_KEY: "fiction_titles_shard2"
+
+
+  fiction_title_barrier3:
+    container_name: fiction_title_barrier3
+    image: fiction_title_barrier:latest
+    entrypoint: python3 /app/main.py
+    depends_on:
+      - rabbitmq
+    links:
+      - rabbitmq
+    environment:
+      SHARD_ID: "3"
+      DST_ROUTING_KEY: "fiction_titles_shard3"
+
+
+  nlp_worker:
+    container_name: nlp_worker
+    image: nlp_worker:latest
+    entrypoint: python3 /app/main.py
+    depends_on:
+      - rabbitmq
+    links:
+      - rabbitmq
+
+  percentile_calculator:
+    container_name: percentile_calculator
+    image: percentile_calculator:latest
+    entrypoint: python3 /app/main.py
+    depends_on:
+      - rabbitmq
+    links:
+      - rabbitmq
+
+  title_sharder:
+    container_name: title_sharder
+    image: title_sharder:latest
+    entrypoint: python3 /app/main.py
+    depends_on:
+      - rabbitmq
+    links:
+      - rabbitmq
+
+  top_fiction_books:
+    container_name: top_fiction_books
+    image: top_fiction_books:latest
+    entrypoint: python3 /app/main.py
     depends_on:
       - rabbitmq
     links:
