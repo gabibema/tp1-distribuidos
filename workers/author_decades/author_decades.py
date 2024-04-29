@@ -21,11 +21,12 @@ def result(accumulator):
 
 def main():
     # Pending: move variables to env.
+    shard_id = 0
     accumulator = []
     rabbit_hostname = 'rabbitmq'
-    src_queue = 'book_queue'
-    src_exchange = 'books_exchange'
-    src_routing_key = '#'
+    src_routing_key = f'authors_shard{shard_id}'
+    src_queue = src_routing_key + '_queue'
+    src_exchange = 'authors_sharded_exchange'
     dst_exchange = 'output_exchange'
     dst_routing_key = 'author_decades'
     worker = Aggregate(aggregate, result, accumulator, rabbit_hostname, src_queue, src_exchange, src_routing_key, ExchangeType.topic, dst_exchange, dst_routing_key)
