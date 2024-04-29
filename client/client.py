@@ -1,28 +1,33 @@
+from queue import Queue
+from socket import SOCK_STREAM, socket, AF_INET, create_connection
 from threading import Thread
-from lib.workers import wait_rabbitmq, Sender
+from lib.transfer.transfer_protocol import MESSAGE_FLAG, TransferProtocol
 
 BATCH_AMOUNT = 200
 
 class Client:
     def __init__(self, config):
+        self.port = config['port']
+        self.conn = None
+        
         self.books_path = config['books_path']
         self.ratings_path = config['ratings_path']
-        
-        self.books_queue = config['books_queue']
-        self.ratings_queue = config['ratings_queue']
 
-        self.books_sender = Thread(target=self.__send_books)
-        self.ratings_sender = Thread(target=self.__send_ratings)
+        self.sender_queue = Queue()
+        self.file_sender = Thread(target=self.__send_files)
+        self.books_reader = Thread(target=self.__read_file(MESSAGE_FLAG['BOOK']))
+        self.ratings_reader = Thread(target=self.__read_file(MESSAGE_FLAG['RATING']))
 
     def start(self):
-        wait_rabbitmq()
-        self.books_sender.start()
-        self.ratings_sender.start()
+        self.__start_socket()
+        self.file_sender.start()
+        self.books_reader.start()
+        self.ratings_reader.start()
         
-    def __send_books(self):
+    def __start_socket(self):
+        self.conn = create_connection(('gateway', self.port))
 
-        publisher = Sender('rabbitmq', self.books_queue)
-
+    def __read_file(self, flag):
         with open(self.books_path, 'r') as file:
             headers = file.readline().strip()
             batch = [headers]
@@ -30,28 +35,16 @@ class Client:
             for line in file:
                 batch.append(line.strip())
                 if len(batch) >= BATCH_AMOUNT:
-                    publisher.publish('\n'.join(batch))
+                    self.sender_queue.put((batch, flag))
                     batch = [headers]
+                    
             if batch:            
-                publisher.publish('\n'.join(batch)) 
+                self.sender_queue.put((batch, flag))
+        
+    def __send_files(self):
+        protocol = TransferProtocol(self.conn)
+        while True:
+            batch, flag = self.sender_queue.get()
+            protocol.send_message('\n'.join(batch), flag)
 
-
-
-    def __send_ratings(self):
-
-        rabbit = Sender('rabbitmq', self.ratings_queue)
-        with open(self.ratings_path, 'r') as file:
-            headers = file.readline().strip()
-            batch = [headers]
-
-            for line in file:
-                batch.append(line.strip())
-                if len(batch) >= BATCH_AMOUNT:
-                    rabbit.publish('\n'.join(batch))
-                    batch = [headers]
-            if batch:            
-                rabbit.publish('\n'.join(batch))
-
-
-        rabbit.close()
-
+            

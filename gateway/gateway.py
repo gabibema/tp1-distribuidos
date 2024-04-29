@@ -1,31 +1,52 @@
-
+from queue import Queue
 from threading import Thread
-from lib.workers import MAX_KEY_LENGTH, Proxy, wait_rabbitmq
+from socket import SOCK_STREAM, socket, AF_INET
+from pika.exchange_type import ExchangeType
+from lib.workers import Proxy, wait_rabbitmq, MAX_KEY_LENGTH
+from lib.transfer.transfer_protocol import MESSAGE_FLAG, TransferProtocol
+
 
 class Gateway:
     def __init__(self, config):
-        self.books_queue = config['books_queue']
+        self.port = config['port']
+        self.conn = None
+
         self.books_exchange = config['books_exchange']
-
-        self.reviews_queue = config['reviews_queue']
-        self.reviews_exchange = config['reviews_exchange']
-
-        self.books_gateway = Thread(target=self.__gateway_books)
-        self.reviews_gateway = Thread(target=self.__gateway_reviews)
+        self.ratings_exchange = config['ratings_exchange']
 
     def start(self):
+        self.__start_socket()
+
+
+    def __start_socket(self):
+        self.conn = socket(AF_INET, SOCK_STREAM)
+        self.conn.bind(('', self.port))
+
+        while True:
+            self.conn.listen(5)
+            print("Waiting for connection...")
+            client, addr = self.conn.accept()
+            Thread(target=self.__handle_client, args=(client,)).start()
+
+
+    def __handle_client(self, client):
         wait_rabbitmq()
-        self.books_gateway.start()
-        self.reviews_gateway.start()
-    
-    def __gateway_books(self):
-        gateway = Proxy('rabbitmq', self.books_queue, self.books_exchange, keys_getter=get_books_keys)
-        gateway.start()
-    
-        
-    def __gateway_reviews(self):
-        gateway = Proxy('rabbitmq', self.reviews_queue, self.reviews_exchange)
-        gateway.start()
+        protocol = TransferProtocol(client)
+        exchanges = {
+            'books_exchange': None,
+            'reviews_exchange': get_books_keys
+        }
+        proxy = Proxy('rabbitmq', exchanges)
+        proxy.channel.exchange_declare('books_exchange', exchange_type=ExchangeType.topic)
+        proxy.channel.exchange_declare('reviews_exchange', exchange_type=ExchangeType.direct)
+
+        while True:
+            message, flag = protocol.receive_message()
+            if flag == MESSAGE_FLAG['BOOK']:
+                proxy.publish(message, 'books_exchange')
+            elif flag == MESSAGE_FLAG['RATING']:
+                proxy.publish(message, 'reviews_exchange')
+
 
 def get_books_keys(row):
     date_str = row['publishedDate']

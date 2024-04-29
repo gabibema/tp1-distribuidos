@@ -3,7 +3,17 @@ services:
     image: rabbitmq:latest
     ports:
       - 15672:15672
-
+  client:
+    image: client:latest
+    entrypoint: python3 /app/main.py
+    volumes:
+      - ./config/client.ini:/app/config.ini
+      - ./lib:/app/lib
+      - ./data:/app/data
+    depends_on:
+      - rabbitmq
+    links:
+      - rabbitmq
   gateway:
     image: gateway:latest
     entrypoint: python3 /app/main.py
@@ -12,14 +22,158 @@ services:
     links:
       - rabbitmq
 
-
-  client:
-    image: client:latest
+  count_90s_revs_by_title-1:
+    container_name: count_90s_revs_by_title-1
+    image: count_90s_revs_by_title:latest
     entrypoint: python3 /app/main.py
-    volumes:
-      - ./config/client.ini:/app/config.ini
-      - ./lib:/app/lib
-      - ./data:/app/data
+    depends_on:
+      - rabbitmq
+    links:
+      - rabbitmq
+
+  fiction_avg_nlp_by_title-1:
+    container_name: fiction_avg_nlp_by_title-1
+    image: fiction_avg_nlp_by_title:latest
+    entrypoint: python3 /app/main.py
+    depends_on:
+      - rabbitmq
+    links:
+      - rabbitmq
+
+  fiction_title_barrier-1:
+    container_name: fiction_title_barrier-1
+    image: fiction_title_barrier:latest
+    entrypoint: python3 /app/main.py
+    depends_on:
+      - rabbitmq
+    links:
+      - rabbitmq
+    environment:
+      SHARD_ID: "1"
+      DST_ROUTING_KEY: "fiction_titles_shard1"
+
+
+  90s_top10_filter-1:
+    container_name: 90s_top10_filter-1
+    image: 90s_top10_filter:latest
+    entrypoint: python3 /app/main.py
+    depends_on:
+      - rabbitmq
+    links:
+      - rabbitmq
+
+  fiction_reviews_filter-1:
+    container_name: fiction_reviews_filter-1
+    image: fiction_reviews_filter:latest
+    entrypoint: python3 /app/main.py
+    depends_on:
+      - rabbitmq
+    links:
+      - rabbitmq
+    environment:
+      SHARD_ID: "1"
+      RABBIT_HOSTNAME: "rabbitmq"
+      SRC_QUEUE: "fiction_titles_shard1_queue"
+      SRC_EXCHANGE: "fiction_titles_barrier_exchange"
+      SRC_ROUTING_KEY: "fiction_titles_shard1"
+      DST_EXCHANGE: "fiction_rev_exchange"
+      TMP_QUEUES_PREFIX: "reviews_shard1"
+
+
+  90s_title_barrier-1:
+    container_name: 90s_title_barrier-1
+    image: 90s_title_barrier:latest
+    entrypoint: python3 /app/main.py
+    depends_on:
+      - rabbitmq
+    links:
+      - rabbitmq
+
+  computer_books_filter-1:
+    container_name: computer_books_filter-1
+    image: computer_books_filter:latest
+    entrypoint: python3 /app/main.py
+    depends_on:
+      - rabbitmq
+    links:
+      - rabbitmq
+
+  author_decades_filter-1:
+    container_name: author_decades_filter-1
+    image: author_decades_filter:latest
+    entrypoint: python3 /app/main.py
+    depends_on:
+      - rabbitmq
+    links:
+      - rabbitmq
+
+  fiction_percentile_calculator-1:
+    container_name: fiction_percentile_calculator-1
+    image: fiction_percentile_calculator:latest
+    entrypoint: python3 /app/main.py
+    depends_on:
+      - rabbitmq
+    links:
+      - rabbitmq
+
+  title_sharder-1:
+    container_name: title_sharder-1
+    image: title_sharder:latest
+    entrypoint: python3 /app/main.py
+    depends_on:
+      - rabbitmq
+    links:
+      - rabbitmq
+
+  90s_title_sharder-1:
+    container_name: 90s_title_sharder-1
+    image: 90s_title_sharder:latest
+    entrypoint: python3 /app/main.py
+    depends_on:
+      - rabbitmq
+    links:
+      - rabbitmq
+
+  author_sharder-1:
+    container_name: author_sharder-1
+    image: author_sharder:latest
+    entrypoint: python3 /app/main.py
+    depends_on:
+      - rabbitmq
+    links:
+      - rabbitmq
+
+  fiction_review_nlp-1:
+    container_name: fiction_review_nlp-1
+    image: fiction_review_nlp:latest
+    entrypoint: python3 /app/main.py
+    depends_on:
+      - rabbitmq
+    links:
+      - rabbitmq
+
+  fiction_title_sharder-1:
+    container_name: fiction_title_sharder-1
+    image: fiction_title_sharder:latest
+    entrypoint: python3 /app/main.py
+    depends_on:
+      - rabbitmq
+    links:
+      - rabbitmq
+
+  90s_reviews_filter-1:
+    container_name: 90s_reviews_filter-1
+    image: 90s_reviews_filter:latest
+    entrypoint: python3 /app/main.py
+    depends_on:
+      - rabbitmq
+    links:
+      - rabbitmq
+
+  fiction_percentile_filter-1:
+    container_name: fiction_percentile_filter-1
+    image: fiction_percentile_filter:latest
+    entrypoint: python3 /app/main.py
     depends_on:
       - rabbitmq
     links:

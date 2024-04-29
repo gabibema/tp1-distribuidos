@@ -30,8 +30,8 @@ class DynamicWorker(Worker):
             for queue_prefix, routing_key in self.tmp_queues:
                 # 2 queues can suscribe to the same messages using the same routing_key, delegate that option to the user.
                 new_dst_queue = f"{queue_prefix}_{msg['request_id']}_queue"
-                self.channel.queue_declare(queue=new_dst_queue)
-                if routing_key is not '':
+                self.channel.queue_declare(queue=new_dst_queue, durable=Ture)
+                if routing_key != '':
                     routing_key = f"{routing_key}_{msg['request_id']}"
                     self.channel.queue_bind(new_dst_queue, self.dst_exchange, routing_key=routing_key)
         self.inner_callback(ch, method, properties, body)
@@ -78,7 +78,7 @@ class DynamicFilter(Worker):
         self.update_state = update_state
         self.filter_condition = filter_condition
         self.tmp_queues_prefix = tmp_queues_prefix
-        self.new(*args, src_routing_key=src_routing_key, **kwargs)
+        self.new(*args, **kwargs)
 
     def callback(self, ch, method, properties, body):
         'Callback used to update the internal state, to change how future messages are filtered'
@@ -86,7 +86,7 @@ class DynamicFilter(Worker):
         self.state = self.update_state(self.state, msg)
         # If there is a new client, subscribe to the new queue
         new_tmp_queue = f"{self.tmp_queues_prefix}_{msg['request_id']}_queue"
-        ch.queue_declare(queue=new_tmp_queue)
+        ch.queue_declare(queue=new_tmp_queue, durable=True)
         ch.basic_consume(queue=new_tmp_queue, on_message_callback=self.filter_callback)
 
     def client_eof(self, msg):

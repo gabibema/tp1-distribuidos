@@ -1,15 +1,12 @@
 from csv import DictReader
 from io import StringIO
-from time import sleep
-import json
+from json import dumps
 from .workers import Worker
-
-WAIT_TIME_PIKA = 15
 
 class Sender(Worker):
     def __init__(self, rabbit_hostname, dst_queue):
         self.new(rabbit_hostname, dst_routing_key=dst_queue)
-        self.channel.queue_declare(queue=dst_queue)
+        self.channel.queue_declare(queue=dst_queue, durable=True)
     
     def callback(self, ch, method, properties, body):
         pass
@@ -17,24 +14,23 @@ class Sender(Worker):
     def publish(self, message):
         self.channel.basic_publish(exchange='', routing_key=self.routing_key, body=message)
 
-
 class Proxy(Worker):
-    def __init__(self, rabbit_hostname, src_queue, dst_exchange, keys_getter = None):
-        self.get_keys = keys_getter if keys_getter is not None else lambda x: ""
-        self.new(rabbit_hostname, src_queue=src_queue, dst_exchange=dst_exchange)
+    def __init__(self, rabbit_hostname, exchanges: dict):
+        self.new(rabbit_hostname)
+        self.exchanges = exchanges
 
-    def callback(self, ch, method, properties, body: bytes):
-        'Callback given to a RabbitMQ queue to invoke for each message in the queue'
-        message = body.decode('utf-8')
+    def publish(self, message, exchange):
         csv_stream = StringIO(message)
         reader = DictReader(csv_stream)
-        
+
         for row in reader:
-            self.channel.basic_publish(exchange=self.dst_exchange, routing_key=self.get_keys(row), body=json.dumps(row))
+            keys = self.get_keys(row, exchange)
+            self.channel.basic_publish(exchange=exchange, routing_key=keys, body=dumps(row))
 
-
-def wait_rabbitmq():
-    """Pauses execution for few seconds in order start rabbitmq broker."""
-    # this needs to be moved to the docker compose as a readiness probe
-    # we should first create rabbit, then workers, and finally start sending messages
-    sleep(WAIT_TIME_PIKA)
+    def get_keys(self, row, exchange):
+        if self.exchanges[exchange]:
+            return self.exchanges[exchange](row)
+        return ''
+    
+    def callback(self, ch, method, properties, body: bytes):
+        pass

@@ -1,15 +1,19 @@
 from abc import ABC, abstractmethod
+from time import sleep
 from pika.exchange_type import ExchangeType
 import pika
 
+WAIT_TIME_PIKA=5
+
 class Worker(ABC):
 
-    def new(self, rabbit_hostname, src_queue='', src_exchange=None, src_routing_key=None, src_exchange_type=ExchangeType.direct, dst_exchange=None, dst_routing_key=None, dst_exchange_type=ExchangeType.direct):
+    def new(self, rabbit_hostname, src_queue='', src_exchange='', src_routing_key='', src_exchange_type=ExchangeType.direct, dst_exchange='', dst_routing_key=None, dst_exchange_type=ExchangeType.direct):
+        wait_rabbitmq()
         # init RabbitMQ channel
         connection = pika.BlockingConnection(pika.ConnectionParameters(host=rabbit_hostname))
         self.channel = connection.channel()
         # init source queue and bind to exchange
-        self.channel.queue_declare(queue=src_queue)
+        self.channel.queue_declare(queue=src_queue, durable=True)
         self.channel.basic_consume(queue=src_queue, on_message_callback=self.callback)
         if src_exchange:
             self.channel.exchange_declare(src_exchange, exchange_type=src_exchange_type)
@@ -89,3 +93,10 @@ class Router(Worker):
         for routing_key in routing_keys:
             ch.basic_publish(exchange=self.dst_exchange, routing_key=routing_key, body=body)
         ch.basic_ack(delivery_tag=method.delivery_tag)
+
+def wait_rabbitmq():
+    """Pauses execution for few seconds in order start rabbitmq broker."""
+    # this needs to be moved to the docker compose as a readiness probe
+    # we should first create rabbit, then workers, and finally start sending messages
+    sleep(WAIT_TIME_PIKA)
+
