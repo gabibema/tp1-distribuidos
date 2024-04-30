@@ -8,11 +8,14 @@ def sentiment(message):
 
 def main():
     # Pending: move variables to env.
-    rabbit_hostname = 'localhost'
-    src_queue = 'fiction_rev_q'
-    src_exchange = 'fiction_rev_exch'
-    dst_exchange = 'nlp_revs_exch'
-    worker = Map(sentiment, rabbit_hostname, src_queue, src_exchange, dst_exchange=dst_exchange)
+    shard_id = 0
+    rabbit_hostname = 'rabbitmq'
+    src_routing_key = f'fiction_rev_shard{shard_id}'
+    src_queue = src_routing_key + '_queue'
+    src_exchange = 'fiction_rev_exchange'
+    dst_exchange = 'nlp_revs_exchange'
+    dst_routing_key = f'nlp_revs_shard{shard_id}'
+    worker = Map(sentiment, rabbit_hostname, src_queue, src_exchange, dst_exchange=dst_exchange, dst_routing_key=dst_routing_key)
     worker.start()
 
 if __name__ == '__main__':

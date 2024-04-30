@@ -1,37 +1,33 @@
 from abc import ABC, abstractmethod
-from csv import DictReader
-from io import StringIO
 from time import sleep
-
-from json import dumps
 from pika.exchange_type import ExchangeType
-
 import pika
 
-WAIT_TIME_PIKA = 15
-MAX_KEY_LENGTH = 255
+WAIT_TIME_PIKA=5
 
 class Worker(ABC):
 
-    def new(self, rabbit_hostname, src_queue, src_exchange='', src_routing_key=None, src_exchange_type=ExchangeType.direct, dst_exchange='', dst_routing_key=None, dst_exchange_type=ExchangeType.direct):
+    def new(self, rabbit_hostname, src_queue='', src_exchange='', src_routing_key='', src_exchange_type=ExchangeType.direct, dst_exchange='', dst_routing_key=None, dst_exchange_type=ExchangeType.direct):
+        wait_rabbitmq()
         # init RabbitMQ channel
         connection = pika.BlockingConnection(pika.ConnectionParameters(host=rabbit_hostname))
         self.channel = connection.channel()
         # init source queue and bind to exchange
-        self.channel.queue_declare(queue=src_queue)
+        self.channel.queue_declare(queue=src_queue, durable=True)
         self.channel.basic_consume(queue=src_queue, on_message_callback=self.callback)
-        self.channel.exchange_declare(src_exchange, exchange_type=src_exchange_type)
-        self.channel.queue_bind(src_queue, src_exchange, routing_key=src_routing_key)
+        if src_exchange:
+            self.channel.exchange_declare(src_exchange, exchange_type=src_exchange_type)
+            self.channel.queue_bind(src_queue, src_exchange, routing_key=src_routing_key)
         # init destination exchange
-        self.dst_exchange = dst_exchange
+        if dst_exchange:
+            self.dst_exchange = dst_exchange
+            self.channel.exchange_declare(exchange=dst_exchange, exchange_type=dst_exchange_type)
         self.routing_key = dst_routing_key
-        self.channel.exchange_declare(exchange=dst_exchange, exchange_type=dst_exchange_type)
 
     def connect_to_peers(self):
         # set up control queues between workers that consume from the same queue
         # this will be used for propagating client EOFs
         raise NotImplementedError
-
 
     @abstractmethod
     def callback(self, ch, method, properties, body):
@@ -86,36 +82,21 @@ class Aggregate(Worker):
             self.channel.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_key, body=msg)
 
 
-class Sender(Worker):
-    def __init__(self, rabbit_hostname, dst_queue):
-        self.new(rabbit_hostname, '', dst_queue)
-    
+class Router(Worker):
+    def __init__(self, routing_fn, *args, **kwargs):
+        self.routing_fn = routing_fn
+        self.new(*args, **kwargs)
+
     def callback(self, ch, method, properties, body):
-        pass
-
-    def publish(self, message):
-        self.channel.basic_publish(exchange='', routing_key=self.dst_queue, body=message)
-
-class Proxy(Worker):
-    def __init__(self, rabbit_hostname, src_queue, exchange, exchange_type='direct', keys_getter = None):
-        self.get_keys = keys_getter if keys_getter is not None else lambda x: ""
-        self.new(rabbit_hostname, src_queue=src_queue, exchange=exchange, exchange_type=exchange_type)
-
-    def callback(self, ch, method, properties, body: bytes):
         'Callback given to a RabbitMQ queue to invoke for each message in the queue'
-        message = body.decode('utf-8').split('\n')
-        headers = message.pop(0).split(',')
-
-        for row in message:
-            csv_file = StringIO(row)
-            reader = DictReader(csv_file, fieldnames=headers)
-            for row in reader:
-                self.channel.basic_publish(exchange=self.dst_queue, routing_key=self.get_keys(row), body=dumps(row))
-
-
+        routing_keys = self.routing_fn(body)
+        for routing_key in routing_keys:
+            ch.basic_publish(exchange=self.dst_exchange, routing_key=routing_key, body=body)
+        ch.basic_ack(delivery_tag=method.delivery_tag)
 
 def wait_rabbitmq():
     """Pauses execution for few seconds in order start rabbitmq broker."""
     # this needs to be moved to the docker compose as a readiness probe
     # we should first create rabbit, then workers, and finally start sending messages
     sleep(WAIT_TIME_PIKA)
+

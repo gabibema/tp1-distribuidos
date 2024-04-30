@@ -1,5 +1,6 @@
 import json
 import random
+from pika.exchange_type import ExchangeType
 from lib.workers import Aggregate
 
 def aggregate(message, accumulator):
@@ -54,12 +55,13 @@ def swap(buffer, i, j):
 
 def main():
     # Pending: move variables to env.
-    rabbit_hostname = 'localhost'
-    src_queue = 'avg_nlp_q'
-    src_exchange = 'avg_nlp_exch'
-    dst_exchange = 'nlp_percentile_exch'
+    rabbit_hostname = 'rabbitmq'
+    src_queue = 'avg_nlp_queue'
+    src_exchange = 'avg_nlp_exchange'
+    dst_exchange = 'nlp_percentile_exchange'
+    dst_routing_key = 'nlp_percentile_queue'
     accumulator = []
-    worker = Aggregate(aggregate, result, accumulator, rabbit_hostname, src_queue, src_exchange, dst_exchange=dst_exchange)
+    worker = Aggregate(aggregate, result, accumulator, rabbit_hostname, src_queue, src_exchange, src_exchange_type=ExchangeType.topic, src_routing_key='#', dst_exchange=dst_exchange, dst_routing_key=dst_routing_key)
     worker.start()
 
 if __name__ == '__main__':
