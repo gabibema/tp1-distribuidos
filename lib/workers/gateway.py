@@ -3,16 +3,6 @@ from io import StringIO
 from json import dumps
 from .workers import Worker
 
-class Sender(Worker):
-    def __init__(self, rabbit_hostname, dst_queue):
-        self.new(rabbit_hostname, dst_routing_key=dst_queue)
-        self.channel.queue_declare(queue=dst_queue, durable=True)
-    
-    def callback(self, ch, method, properties, body):
-        pass
-
-    def publish(self, message):
-        self.channel.basic_publish(exchange='', routing_key=self.routing_key, body=message)
 
 class Proxy(Worker):
     def __init__(self, rabbit_hostname, exchanges: dict):
