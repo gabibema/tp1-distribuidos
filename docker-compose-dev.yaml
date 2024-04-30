@@ -1,4 +1,3 @@
-
 services:
   rabbitmq:
     image: rabbitmq:latest
@@ -10,8 +9,8 @@ services:
       interval: 5s
       timeout: 60s
       retries: 5
-      start_period: 10s
-
+      start_period: 10s  
+  
   client:
     image: client:latest
     entrypoint: python3 /app/main.py
@@ -23,75 +22,8 @@ services:
   gateway:
     image: gateway:latest
     entrypoint: python3 /app/main.py
-    links:
-      - rabbitmq
-
-  90s_reviews_filter-1:
-    container_name: 90s_reviews_filter-1
-    image: 90s_reviews_filter:latest
-    entrypoint: python3 /app/main.py
     depends_on:
-      rabbitmq:
-        condition: service_healthy
-    links:
-      - rabbitmq
-
-  90s_title_barrier-1:
-    container_name: 90s_title_barrier-1
-    image: 90s_title_barrier:latest
-    entrypoint: python3 /app/main.py
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-    links:
-      - rabbitmq
-
-  90s_title_sharder-1:
-    container_name: 90s_title_sharder-1
-    image: 90s_title_sharder:latest
-    entrypoint: python3 /app/main.py
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-    links:
-      - rabbitmq
-
-  90s_top10_filter-1:
-    container_name: 90s_top10_filter-1
-    image: 90s_top10_filter:latest
-    entrypoint: python3 /app/main.py
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-    links:
-      - rabbitmq
-
-  author_decades_filter-1:
-    container_name: author_decades_filter-1
-    image: author_decades_filter:latest
-    entrypoint: python3 /app/main.py
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-    links:
-      - rabbitmq
-
-  author_sharder-1:
-    container_name: author_sharder-1
-    image: author_sharder:latest
-    entrypoint: python3 /app/main.py
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-    links:
-      - rabbitmq
-
-  computer_books_filter-1:
-    container_name: computer_books_filter-1
-    image: computer_books_filter:latest
-    entrypoint: python3 /app/main.py
-    depends_on:
-      rabbitmq:
+      rabbitmq: 
         condition: service_healthy
     links:
       - rabbitmq
@@ -101,7 +33,7 @@ services:
     image: count_90s_revs_by_title:latest
     entrypoint: python3 /app/main.py
     depends_on:
-      rabbitmq:
+      rabbitmq: 
         condition: service_healthy
     links:
       - rabbitmq
@@ -111,27 +43,31 @@ services:
     image: fiction_avg_nlp_by_title:latest
     entrypoint: python3 /app/main.py
     depends_on:
-      rabbitmq:
+      rabbitmq: 
         condition: service_healthy
     links:
       - rabbitmq
 
-  fiction_percentile_calculator-1:
-    container_name: fiction_percentile_calculator-1
-    image: fiction_percentile_calculator:latest
+  fiction_title_barrier-1:
+    container_name: fiction_title_barrier-1
+    image: fiction_title_barrier:latest
     entrypoint: python3 /app/main.py
     depends_on:
-      rabbitmq:
+      rabbitmq: 
         condition: service_healthy
     links:
       - rabbitmq
+    environment:
+      SHARD_ID: "1"
+      DST_ROUTING_KEY: "fiction_titles_shard1"
 
-  fiction_percentile_filter-1:
-    container_name: fiction_percentile_filter-1
-    image: fiction_percentile_filter:latest
+
+  90s_top10_filter-1:
+    container_name: 90s_top10_filter-1
+    image: 90s_top10_filter:latest
     entrypoint: python3 /app/main.py
     depends_on:
-      rabbitmq:
+      rabbitmq: 
         condition: service_healthy
     links:
       - rabbitmq
@@ -141,7 +77,7 @@ services:
     image: fiction_reviews_filter:latest
     entrypoint: python3 /app/main.py
     depends_on:
-      rabbitmq:
+      rabbitmq: 
         condition: service_healthy
     links:
       - rabbitmq
@@ -155,36 +91,42 @@ services:
       TMP_QUEUES_PREFIX: "reviews_shard1"
 
 
-  fiction_review_nlp-1:
-    container_name: fiction_review_nlp-1
-    image: fiction_review_nlp:latest
+  90s_title_barrier-1:
+    container_name: 90s_title_barrier-1
+    image: 90s_title_barrier:latest
     entrypoint: python3 /app/main.py
     depends_on:
-      rabbitmq:
+      rabbitmq: 
         condition: service_healthy
     links:
       - rabbitmq
 
-  fiction_title_barrier-1:
-    container_name: fiction_title_barrier-1
-    image: fiction_title_barrier:latest
+  computer_books_filter-1:
+    container_name: computer_books_filter-1
+    image: computer_books_filter:latest
     entrypoint: python3 /app/main.py
     depends_on:
-      rabbitmq:
+      rabbitmq: 
         condition: service_healthy
     links:
       - rabbitmq
-    environment:
-      SHARD_ID: "1"
-      DST_ROUTING_KEY: "fiction_titles_shard1"
 
-
-  fiction_title_sharder-1:
-    container_name: fiction_title_sharder-1
-    image: fiction_title_sharder:latest
+  author_decades_filter-1:
+    container_name: author_decades_filter-1
+    image: author_decades_filter:latest
     entrypoint: python3 /app/main.py
     depends_on:
-      rabbitmq:
+      rabbitmq: 
+        condition: service_healthy
+    links:
+      - rabbitmq
+
+  fiction_percentile_calculator-1:
+    container_name: fiction_percentile_calculator-1
+    image: fiction_percentile_calculator:latest
+    entrypoint: python3 /app/main.py
+    depends_on:
+      rabbitmq: 
         condition: service_healthy
     links:
       - rabbitmq
@@ -194,7 +136,67 @@ services:
     image: title_sharder:latest
     entrypoint: python3 /app/main.py
     depends_on:
-      rabbitmq:
+      rabbitmq: 
+        condition: service_healthy
+    links:
+      - rabbitmq
+
+  90s_title_sharder-1:
+    container_name: 90s_title_sharder-1
+    image: 90s_title_sharder:latest
+    entrypoint: python3 /app/main.py
+    depends_on:
+      rabbitmq: 
+        condition: service_healthy
+    links:
+      - rabbitmq
+
+  author_sharder-1:
+    container_name: author_sharder-1
+    image: author_sharder:latest
+    entrypoint: python3 /app/main.py
+    depends_on:
+      rabbitmq: 
+        condition: service_healthy
+    links:
+      - rabbitmq
+
+  fiction_review_nlp-1:
+    container_name: fiction_review_nlp-1
+    image: fiction_review_nlp:latest
+    entrypoint: python3 /app/main.py
+    depends_on:
+      rabbitmq: 
+        condition: service_healthy
+    links:
+      - rabbitmq
+
+  fiction_title_sharder-1:
+    container_name: fiction_title_sharder-1
+    image: fiction_title_sharder:latest
+    entrypoint: python3 /app/main.py
+    depends_on:
+      rabbitmq: 
+        condition: service_healthy
+    links:
+      - rabbitmq
+
+  90s_reviews_filter-1:
+    container_name: 90s_reviews_filter-1
+    image: 90s_reviews_filter:latest
+    entrypoint: python3 /app/main.py
+    depends_on:
+      rabbitmq: 
+        condition: service_healthy
+    links:
+      - rabbitmq
+
+  fiction_percentile_filter-1:
+    container_name: fiction_percentile_filter-1
+    image: fiction_percentile_filter:latest
+    entrypoint: python3 /app/main.py
+    depends_on:
+      rabbitmq: 
         condition: service_healthy
     links:
       - rabbitmq
