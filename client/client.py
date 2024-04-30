@@ -30,18 +30,26 @@ class Client:
         self.conn = create_connection(('gateway', self.port))
 
     def __read_file(self, flag):
-        with open(self.books_path, 'r') as file:
+        path = self.ratings_path
+        if flag == MESSAGE_FLAG['BOOK']:
+            path = self.books_path
+        
+
+        with open(path, 'r') as file:
             headers = file.readline().strip()
             batch = [self.uid,headers]
 
             for line in file:
-                batch.append(line.strip())
-                if len(batch) >= BATCH_AMOUNT:
+               batch.append(line.strip())
+               if len(batch) >= BATCH_AMOUNT:
                     self.sender_queue.put((batch, flag))
                     batch = [self.uid,headers]
-                    
+                   
             if batch:            
-                self.sender_queue.put((batch, flag))
+               self.sender_queue.put((batch, flag))
+
+            self.sender_queue.put(([self.uid], flag))
+
         
     def __send_files(self):
         protocol = TransferProtocol(self.conn)

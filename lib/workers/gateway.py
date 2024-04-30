@@ -24,10 +24,16 @@ class Proxy(Worker):
         uid = csv_stream.readline().strip()
         reader = DictReader(csv_stream)
 
+        processed_row = False
         for row in reader:
+            processed_row = True
             row['request_id'] = uid
             keys = self.get_keys(row, exchange)
             self.channel.basic_publish(exchange=exchange, routing_key=keys, body=dumps(row))
+        
+        if not processed_row:
+            self.channel.basic_publish(exchange=exchange, routing_key='eof', body=dumps({'request_id': uid}))
+
 
     def get_keys(self, row, exchange):
         if self.exchanges[exchange]:
