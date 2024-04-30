@@ -34,8 +34,8 @@ class Gateway:
         wait_rabbitmq()
         protocol = TransferProtocol(client)
         exchanges = {
-            'books_exchange': None,
-            'reviews_exchange': get_books_keys
+            'books_exchange': get_books_keys,
+            'reviews_exchange': None
         }
         proxy = Proxy('rabbitmq', exchanges)
         proxy.channel.exchange_declare('books_exchange', exchange_type=ExchangeType.topic)

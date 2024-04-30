@@ -1,17 +1,15 @@
 services:
   client:
-    build:
-      context: .
-      dockerfile: ./client/Dockerfile
+    image: client:latest
     entrypoint: python3 /app/main.py
     volumes:
       - ./config/client.ini:/app/config.ini
       - ./lib:/app/lib
       - ./data:/app/data
-    networks: 
+    networks:
       - default
-  
+
 networks:
-    default:
-      external: true
+  default:
+    external:
       name: tp1-distribuidos_default

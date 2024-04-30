@@ -87,14 +87,6 @@ services:
       retries: 5
       start_period: 10s
 
-  client:
-    image: client:latest
-    entrypoint: python3 /app/main.py
-    volumes:
-      - ./config/client.ini:/app/config.ini
-      - ./lib:/app/lib
-      - ./data:/app/data
-
   gateway:
     image: gateway:latest
     entrypoint: python3 /app/main.py

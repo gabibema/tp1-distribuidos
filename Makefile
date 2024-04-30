@@ -7,22 +7,6 @@ docker-image:
 	docker build -f ./base-image/Dockerfile -t "rabbitmq-python-base:latest" .
 	docker build -f ./rabbitmq/Dockerfile -t "rabbitmq:latest" .
 	docker build -f ./gateway/Dockerfile -t "gateway:latest" .
-	docker build -f ./workers/90s_reviews_filter/Dockerfile -t "90s_reviews_filter:latest" .
-	docker build -f ./workers/90s_title_barrier/Dockerfile -t "90s_title_barrier:latest" .
-	docker build -f ./workers/90s_title_sharder/Dockerfile -t "90s_title_sharder:latest" .
-	docker build -f ./workers/90s_top10_filter/Dockerfile -t "90s_top10_filter:latest" .
-	docker build -f ./workers/author_decades_filter/Dockerfile -t "author_decades_filter:latest" .
-	docker build -f ./workers/author_sharder/Dockerfile -t "author_sharder:latest" .
-	docker build -f ./workers/computer_books_filter/Dockerfile -t "computer_books_filter:latest" .
-	docker build -f ./workers/count_90s_revs_by_title/Dockerfile -t "count_90s_revs_by_title:latest" .
-	docker build -f ./workers/fiction_avg_nlp_by_title/Dockerfile -t "fiction_avg_nlp_by_title:latest" .
-	docker build -f ./workers/fiction_percentile_calculator/Dockerfile -t "fiction_percentile_calculator:latest" .
-	docker build -f ./workers/fiction_percentile_filter/Dockerfile -t "fiction_percentile_filter:latest" .
-	docker build -f ./workers/fiction_review_nlp/Dockerfile -t "fiction_review_nlp:latest" .
-	docker build -f ./workers/fiction_reviews_filter/Dockerfile -t "fiction_reviews_filter:latest" .
-	docker build -f ./workers/fiction_title_barrier/Dockerfile -t "fiction_title_barrier:latest" .
-	docker build -f ./workers/fiction_title_sharder/Dockerfile -t "fiction_title_sharder:latest" .
-	docker build -f ./workers/title_sharder/Dockerfile -t "title_sharder:latest" .
 
 .PHONY: docker-image
 
