@@ -12,6 +12,7 @@ class Worker(ABC):
         # init RabbitMQ channel
         connection = pika.BlockingConnection(pika.ConnectionParameters(host=rabbit_hostname))
         self.channel = connection.channel()
+        self.channel.confirm_delivery()
         # init source queue and bind to exchange
         self.channel.queue_declare(queue=src_queue, durable=True)
         self.channel.basic_consume(queue=src_queue, on_message_callback=self.callback)
@@ -23,6 +24,7 @@ class Worker(ABC):
             self.dst_exchange = dst_exchange
             self.channel.exchange_declare(exchange=dst_exchange, exchange_type=dst_exchange_type)
         self.routing_key = dst_routing_key
+        self.pending_messages = []
 
     def connect_to_peers(self):
         # set up control queues between workers that consume from the same queue
@@ -33,6 +35,19 @@ class Worker(ABC):
     def callback(self, ch, method, properties, body):
         'Callback given to a RabbitMQ queue to invoke for each message in the queue'
         pass
+
+    def check_pending_messages(self, timeout=5):
+        start_time = time()
+        while time() - start_time < timeout:
+            exchange, routing_key, body = self.pending_messages.pop(0)
+            self.try_publish(exchange, routing_key, body)
+
+    def try_publish(self, exchange, routing_key, body):
+        try:
+            self.channel.basic_publish(exchange=exchange, routing_key=routing_key, body=body, mandatory=True)
+        except pika.exceptions.UnroutableError:
+            self.pending_messages.append((exchange, routing_key, body))
+
 
     def start(self):
         self.channel.start_consuming()

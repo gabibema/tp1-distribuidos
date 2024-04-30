@@ -20,6 +20,7 @@ class Proxy(Worker):
         self.exchanges = exchanges
 
     def publish(self, message, exchange):
+        self.check_pending_messages()
         csv_stream = StringIO(message)
         uid = csv_stream.readline().strip()
         reader = DictReader(csv_stream)
@@ -29,10 +30,10 @@ class Proxy(Worker):
             processed_row = True
             row['request_id'] = uid
             keys = self.get_keys(row, exchange)
-            self.channel.basic_publish(exchange=exchange, routing_key=keys, body=dumps(row))
+            self.try_publish(exchange, keys, dumps(row))
         
         if not processed_row:
-            self.channel.basic_publish(exchange=exchange, routing_key='eof', body=dumps({'request_id': uid}))
+            self.try_publish(exchange, 'eof', dumps({'request_id': uid}))
 
 
     def get_keys(self, row, exchange):

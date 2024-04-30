@@ -5,6 +5,7 @@ from pika.exchange_type import ExchangeType
 from lib.workers import Proxy, wait_rabbitmq, MAX_KEY_LENGTH
 from lib.transfer.transfer_protocol import MESSAGE_FLAG, TransferProtocol
 
+CLIENTS_BACKLOG = 5
 
 
 class Gateway:
@@ -24,8 +25,7 @@ class Gateway:
         self.conn.bind(('', self.port))
 
         while True:
-            self.conn.listen(5)
-            print("Waiting for connection...")
+            self.conn.listen(CLIENTS_BACKLOG)
             client, addr = self.conn.accept()
             Thread(target=self.__handle_client, args=(client,)).start()
 
