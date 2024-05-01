@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from time import sleep
+import json
 from pika.exchange_type import ExchangeType
 import pika
 
@@ -49,7 +50,7 @@ class Filter(Worker):
 
     def callback(self, ch, method, properties, body):
         'Callback given to a RabbitMQ queue to invoke for each message in the queue'
-        if self.filter_condition(body):
+        if self.filter_condition(body) or json.loads(body)['type'] == 'eof':
             ch.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_key, body=body)
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
@@ -84,7 +85,7 @@ class Aggregate(Worker):
     def end(self, message):
         for msg in self.result_fn(message, self.accumulator):
             self.channel.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_key, body=msg)
-        self.channel.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_key, body=json.dumps({'request_id': message, 'type': 'eof'}))
+        self.channel.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_key, body=json.dumps(message))
 
 
 class Router(Worker):

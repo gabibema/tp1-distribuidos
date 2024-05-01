@@ -71,7 +71,7 @@ class DynamicAggregate(DynamicWorker):
         for msg in self.result_fn(message, self.accumulator):
             routing_key = f"{self.routing_key}_{msg['request_id']}"
             self.channel.basic_publish(exchange=self.dst_exchange, routing_key=routing_key, body=msg)
-        self.channel.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_key, body=json.dumps({'request_id': message, 'type': 'eof'}))
+        self.channel.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_key, body=json.dumps(message))
 
 
 class DynamicFilter(Worker):
@@ -95,13 +95,17 @@ class DynamicFilter(Worker):
         ch.queue_declare(queue=new_tmp_queue, durable=True)
         ch.basic_consume(queue=new_tmp_queue, on_message_callback=self.filter_callback)
 
-    def client_eof(self, msg):
-        # Pending: If an EOF arrives, delete client queue
+    def client_eof(self, body):
+        msg = json.loads(body)
         self.state = self.update_state(self.state, msg)
+        tmp_queue = f"{self.tmp_queues_prefix}_{msg['request_id']}_queue"
+        self.channel.queue_delete(queue=tmp_queue)
 
     def filter_callback(self, ch, method, properties, body):
         'Callback used to filter messages in a queue'
-        # Pending: If message is an EOF, delegate to self.client_eof
-        if self.filter_condition(self.state, body):
+        if json.loads(body).get('type') == 'eof':
+            self.client_eof(body)
+            ch.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_key, body=body)
+        elif self.filter_condition(self.state, body):
             ch.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_key, body=body)
         ch.basic_ack(delivery_tag=method.delivery_tag)
