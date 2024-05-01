@@ -37,6 +37,9 @@ class Worker(ABC):
         pass
 
     def check_pending_messages(self, timeout=5):
+        if len(self.pending_messages) == 0:
+            return
+        
         start_time = time()
         while time() - start_time < timeout:
             exchange, routing_key, body = self.pending_messages.pop(0)

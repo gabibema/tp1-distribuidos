@@ -11,5 +11,5 @@ services:
 
 networks:
   default:
-    external:
-      name: tp1-distribuidos_default
+    name: tp1-distribuidos_default
+    external: true
