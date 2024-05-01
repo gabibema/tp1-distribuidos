@@ -8,10 +8,9 @@ def aggregate(msg, accumulator):
     accumulator[msg['request_id']].append(msg['average'])
 
 def result(msg, accumulator):
-    acc = accumulator.get(msg['request_id'], [])
+    acc = accumulator.pop(msg['request_id'], [])
     percentile_10_idx = len(acc) / 10
     percentile = kth_smallest(percentile_10_idx, acc, 0, len(acc) - 1)
-    del accumulator[msg['request_id']]
     return [json.dumps({'request_id': msg['request_id'], 'percentile': percentile})]
 
 def kth_smallest(k, buffer, start, end):

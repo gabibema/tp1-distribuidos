@@ -12,8 +12,7 @@ def aggregate(msg, accumulator):
     accumulator[msg['request_id']][msg['Title']] = new_values
 
 def result(msg, accumulator):
-    acc = accumulator.get(msg['request_id'], {})
-    del accumulator[msg['request_id']]
+    acc = accumulator.pop(msg['request_id'], {})
     return [json.dumps({'request_id': msg['request_id'], 'Title': title, 'average': values.sum/values.count}) for title, values in acc.items()]
 
 def main():

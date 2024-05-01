@@ -6,8 +6,7 @@ def aggregate(msg, accumulator):
     accumulator[msg['request_id']].append(msg['Title'])
 
 def result(msg, accumulator):
-    titles = accumulator.get(msg['request_id'], [])
-    del accumulator[msg['request_id']]
+    titles = accumulator.pop(msg['request_id'], [])
     return [json.dumps({'request_id': msg['request_id'], 'titles': titles})]
 
 def main():
@@ -23,7 +22,7 @@ def main():
     src_exchange = '90s_books_sharded_exchange'
     dst_exchange = '90s_titles_barrier_exchange'
     dst_routing_key = f'90s_titles_shard{shard_id}'
-    accumulator = []
+    accumulator = {}
     worker = Aggregate(aggregate, result, accumulator, rabbit_hostname, src_queue, src_exchange, src_routing_key, dst_exchange=dst_exchange, dst_routing_key=dst_routing_key)
     worker.start()
 

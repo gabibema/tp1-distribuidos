@@ -85,6 +85,7 @@ class DynamicFilter(Worker):
         self.update_state = update_state
         self.filter_condition = filter_condition
         self.tmp_queues_prefix = tmp_queues_prefix
+        self.state = {}
         self.new(*args, **kwargs)
 
     def callback(self, ch, method, properties, body):

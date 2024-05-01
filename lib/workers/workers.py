@@ -20,9 +20,11 @@ class Worker(ABC):
         if src_exchange:
             self.channel.exchange_declare(src_exchange, exchange_type=src_exchange_type)
             self.channel.queue_bind(src_queue, src_exchange, routing_key=src_routing_key)
+        if src_exchange_type == ExchangeType.topic:
+            self.channel.queue_bind(src_queue, src_exchange, routing_key='EOF')
         # init destination exchange
+        self.dst_exchange = dst_exchange
         if dst_exchange:
-            self.dst_exchange = dst_exchange
             self.channel.exchange_declare(exchange=dst_exchange, exchange_type=dst_exchange_type)
         self.routing_key = dst_routing_key
         self.pending_messages = []
@@ -52,7 +54,7 @@ class Filter(Worker):
 
     def callback(self, ch, method, properties, body):
         'Callback given to a RabbitMQ queue to invoke for each message in the queue'
-        if self.filter_condition(body) or json.loads(body).get('type') == 'EOF':
+        if json.loads(body).get('type') == 'EOF' or self.filter_condition(body):
             ch.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_key, body=body)
         ch.basic_ack(delivery_tag=method.delivery_tag)
 

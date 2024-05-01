@@ -6,9 +6,11 @@ SHARD_COUNT = 1
 def routing_fn(body):
     "Shard by title and route to request specific tmp queues"
     msg = json.loads(body)
-    shard_id = hash(msg['Title']) % SHARD_COUNT
-    routing_key = f"90s_books_shard{shard_id}"
-    return [routing_key]
+    if msg.get('type') == 'EOF':
+        return [f"90s_books_shard{shard_id}" for shard_id in range(SHARD_COUNT)]
+    else:
+        shard_id = hash(msg['Title']) % SHARD_COUNT
+        return [f"90s_books_shard{shard_id}"]
 
 def main():
     # Pending: move variables to env.
