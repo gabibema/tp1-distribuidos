@@ -12,18 +12,18 @@ class Client:
         self.port = config['port']
         
         self.books_path = config['books_path']
-        self.ratings_path = config['ratings_path']
+        self.reviews_path = config['reviews_path']
 
         self.uid = str(uuid4())
         self.books_sender = Process(target=self.__send_file(MESSAGE_FLAG['BOOK'], self.books_path))
-        self.ratings_sender = Process(target=self.__send_file(MESSAGE_FLAG['RATING'], self.ratings_path))
+        self.reviews_sender = Process(target=self.__send_file(MESSAGE_FLAG['REVIEW'], self.reviews_path))
 
 
     def start(self):
         self.books_sender.start()
-        self.ratings_sender.start()
+        self.reviews_sender.start()
         self.books_sender.join()
-        self.ratings_sender.join()
+        self.reviews_sender.join()
     
     def __try_connect(self, host, port, timeout=15):
         actual_time = time()
@@ -49,7 +49,7 @@ class Client:
                if len(batch) >= BATCH_AMOUNT:
                     protocol.send_message('\n'.join(batch), flag)
                     batch = [self.uid,headers]
-                   
+
             if batch:            
                protocol.send_message('\n'.join(batch), flag)
 

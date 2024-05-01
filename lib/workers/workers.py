@@ -30,7 +30,6 @@ class Worker(ABC):
         if dst_exchange:
             self.channel.exchange_declare(exchange=dst_exchange, exchange_type=dst_exchange_type)
         self.routing_key = dst_routing_key
-        self.pending_messages = []
 
     def connect_to_peers(self):
         # set up control queues between workers that consume from the same queue

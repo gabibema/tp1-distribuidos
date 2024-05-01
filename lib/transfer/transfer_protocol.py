@@ -4,7 +4,7 @@ from typing import Tuple
 
 MESSAGE_FLAG = {
     'BOOK': '1',
-    'RATING': '2',
+    'REVIEW': '2',
     'ERROR': '3'
 }
 

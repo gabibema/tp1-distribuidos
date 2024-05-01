@@ -10,7 +10,7 @@ def get_config_params():
     try:
         config_params = {
             'books_path': os.getenv('BOOKS_PATH', default=config['DEFAULT'].get('BOOKS_PATH')),
-            'ratings_path': os.getenv('RATINGS_PATH', default=config['DEFAULT'].get('RATINGS_PATH')),
+            'reviews_path': os.getenv('REVIEWS_PATH', default=config['DEFAULT'].get('REVIEWS_PATH')),
             'port': int(os.getenv('PORT', default=config['DEFAULT'].get('PORT'))),
             'log_level': os.getenv('LOG_LEVEL', default=config['DEFAULT'].get('LOG_LEVEL')),
         }
