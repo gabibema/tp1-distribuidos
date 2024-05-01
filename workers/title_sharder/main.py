@@ -1,13 +1,13 @@
-import json
 from lib.workers import DynamicRouter
 SHARD_COUNT = 1
 
-def routing_fn(body):
+def routing_fn(msg):
     "Shard by title and route to request specific tmp queues"
-    msg = json.loads(body)
-    shard_id = hash(msg['Title']) % SHARD_COUNT
-    routing_key = f"reviews_shard{shard_id}_{msg['request_id']}"
-    return [routing_key]
+    if msg.get('type') == 'EOF':
+        return [f"reviews_shard{shard_id}_{msg['request_id']}" for shard_id in range(SHARD_COUNT)]
+    else:
+        shard_id = hash(msg['Title']) % SHARD_COUNT
+        return [f"reviews_shard{shard_id}_{msg['request_id']}"]
 
 def main():
     # Pending: move variables to env.

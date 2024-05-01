@@ -2,8 +2,7 @@ import json
 import logging
 from lib.workers import Aggregate
 
-def aggregate(message, accumulator):
-    msg = json.loads(message)
+def aggregate(msg, accumulator):
     date = msg['publishedDate']
     if not date:
         # skip books with invalid date
@@ -17,11 +16,13 @@ def aggregate(message, accumulator):
     # ignore brackets
     authors = msg['authors'][1:-1]
     for author in authors.split(','):
-        accumulator[author] = accumulator.get(author, set())
-        accumulator[author].add(decade)
+        accumulator[msg['request_id']] = accumulator.get(msg['request_id'], {})
+        accumulator[msg['request_id']][author] = accumulator[msg['request_id']].get(author, set())
+        accumulator[msg['request_id']][author].add(decade)
 
-def result(accumulator):
-    return [author for author, decades in accumulator.items() if len(decades) >= 10]
+def result(msg, accumulator):
+    authors = [author for author, decades in accumulator.pop(msg['request_id'], {}).items() if len(decades) >= 10]
+    return [json.dumps({'request_id': msg['request_id'], 'authors': authors})]
 
 def main():
     # Pending: move variables to env.
@@ -31,10 +32,9 @@ def main():
     src_routing_key = f'authors_shard{shard_id}'
     src_queue = src_routing_key + '_queue'
     src_exchange = 'authors_sharded_exchange'
-    dst_exchange = 'output_exchange'
     dst_routing_key = 'author_decades'
     logging.basicConfig(level=logging.WARNING, format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
-    worker = Aggregate(aggregate, result, accumulator, rabbit_hostname, src_queue, src_exchange, src_routing_key, dst_exchange=dst_exchange, dst_routing_key=dst_routing_key)
+    worker = Aggregate(aggregate, result, accumulator, rabbit_hostname, src_queue, src_exchange, src_routing_key, dst_routing_key=dst_routing_key)
     worker.start()
 
 if __name__ == '__main__':

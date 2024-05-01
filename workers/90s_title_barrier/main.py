@@ -1,14 +1,13 @@
 import json
 from lib.workers import Aggregate
 
-def aggregate(message, accumulator):
-    msg = json.loads(message)
+def aggregate(msg, accumulator):
     accumulator[msg['request_id']] = accumulator.get(msg['request_id'], [])
     accumulator[msg['request_id']].append(msg['Title'])
 
-def result(accumulator):
-    # Pending: When adding concurrent requests this should only return the result for the corresponding request_id
-    return [v for k,v in accumulator.items()][0]
+def result(msg, accumulator):
+    titles = accumulator.pop(msg['request_id'], [])
+    return [json.dumps({'request_id': msg['request_id'], 'titles': titles})]
 
 def main():
     """
@@ -23,7 +22,7 @@ def main():
     src_exchange = '90s_books_sharded_exchange'
     dst_exchange = '90s_titles_barrier_exchange'
     dst_routing_key = f'90s_titles_shard{shard_id}'
-    accumulator = []
+    accumulator = {}
     worker = Aggregate(aggregate, result, accumulator, rabbit_hostname, src_queue, src_exchange, src_routing_key, dst_exchange=dst_exchange, dst_routing_key=dst_routing_key)
     worker.start()
 

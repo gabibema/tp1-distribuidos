@@ -4,11 +4,11 @@ from pika.exchange_type import ExchangeType
 from lib.workers import DynamicFilter
 
 def update_state(old_state, message):
-    if message['type'] == 'new_request':
-        old_state[message['request_id']] = message['percentile']
-    elif message['type'] == 'EOF':
+    if message.get('type') == 'EOF':
         # delete info that was required to process the request, which has been fulfilled
-        del old_state[message['request_id']]
+        old_state.pop(msg['request_id'], None)
+    else:
+        old_state[message['request_id']] = message['percentile']
     return old_state
 
 def filter_condition(state, body):

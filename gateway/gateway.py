@@ -37,8 +37,16 @@ class Gateway:
             'reviews_exchange': None
         }
         proxy = Proxy('rabbitmq', exchanges)
+        # pending: declare resources once when Gateway is created
         proxy.channel.exchange_declare('books_exchange', exchange_type=ExchangeType.topic)
         proxy.channel.exchange_declare('reviews_exchange', exchange_type=ExchangeType.direct)
+        proxy.channel.exchange_declare('popular_90s_exchange', exchange_type=ExchangeType.direct)
+        proxy.channel.queue_declare(queue='author_decades', durable=True)
+        proxy.channel.queue_declare(queue='computer_books', durable=True)
+        proxy.channel.queue_declare(queue='top_fiction_books', durable=True)
+        proxy.channel.queue_declare(queue='top_90s_books', durable=True)
+        proxy.channel.queue_declare(queue='popular_90s_books', durable=True)
+        proxy.channel.queue_bind('popular_90s_books', 'popular_90s_exchange', routing_key='popular_90s_queue')
 
         while True:
             message, flag = protocol.receive_message()
@@ -59,7 +67,6 @@ def get_books_keys(row):
     categories = categories.replace("'", "").replace(" & ", ".")
     categories_list = categories.split(", ")
     categories_dots = '.'.join(categories_list)
-    if len(categories_dots) + len(year_dots) > MAX_KEY_LENGTH:
-        categories_dots = categories_dots[:MAX_KEY_LENGTH - len(year_dots) - 1]
-
-    return f"{categories_dots}.{year_dots}"
+    if len(categories_dots) + len(year_dots) + 2 > MAX_KEY_LENGTH:
+        categories_dots = categories_dots[:MAX_KEY_LENGTH - len(year_dots) - 2]
+    return f".{categories_dots}.{year_dots}"

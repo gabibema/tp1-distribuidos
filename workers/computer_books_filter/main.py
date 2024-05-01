@@ -15,7 +15,7 @@ def main():
     rabbit_hostname = 'rabbitmq'
     src_queue = 'computers_queue'
     src_exchange = 'books_exchange'
-    src_routing_key = '#.computers.#'
+    src_routing_key = '#.Computers.#'
     dst_routing_key = 'computer_books'
     worker = Filter(title_filter, rabbit_hostname, src_queue, src_exchange, src_routing_key, ExchangeType.topic, dst_routing_key)
     worker.start()
