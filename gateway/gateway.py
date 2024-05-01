@@ -1,4 +1,3 @@
-from queue import Queue
 from threading import Thread
 from socket import SOCK_STREAM, socket, AF_INET
 from pika.exchange_type import ExchangeType

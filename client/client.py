@@ -1,4 +1,3 @@
-from queue import Queue
 from socket import SOCK_STREAM, socket, AF_INET, create_connection
 from multiprocessing import Process
 from time import time
