@@ -8,7 +8,7 @@ WAIT_TIME_PIKA=5
 
 class Worker(ABC):
 
-    def new(self, rabbit_hostname, src_queue='', src_exchange='', src_routing_key=[''], src_exchange_type=ExchangeType.direct, dst_exchange='', dst_routing_key=None, dst_exchange_type=ExchangeType.direct):
+    def new(self, rabbit_hostname, src_queue='', src_exchange='', src_routing_key=[''], src_exchange_type=ExchangeType.direct, dst_exchange='', dst_routing_key='', dst_exchange_type=ExchangeType.direct):
         wait_rabbitmq()
         # init RabbitMQ channel
         connection = pika.BlockingConnection(pika.ConnectionParameters(host=rabbit_hostname))
