@@ -1,6 +1,6 @@
-from csv import DictReader
 from io import StringIO
-from json import dumps
+from csv import DictReader
+import json
 from .workers import Worker
 
 
@@ -20,11 +20,9 @@ class Proxy(Worker):
             processed_row = True
             row['request_id'] = uid
             keys = self.get_keys(row, exchange)
-            self.try_publish(exchange, keys, dumps(row))
-        
+            self.channel.basic_publish(exchange=exchange, routing_key=routing_key, body=json.dumps(row))
         if not processed_row:
-            self.try_publish(exchange, 'eof', dumps({'request_id': uid, 'type': 'EOF'}))
-
+            self.channel.basic_publish(exchange=exchange, routing_key='eof', body=json.dumps({'request_id': uid, 'type': 'EOF'}))
 
     def get_keys(self, row, exchange):
         if self.exchanges[exchange]:

@@ -37,22 +37,6 @@ class Worker(ABC):
         'Callback given to a RabbitMQ queue to invoke for each message in the queue'
         pass
 
-    def check_pending_messages(self, timeout=5):
-        if len(self.pending_messages) == 0:
-            return
-        
-        start_time = time()
-        while time() - start_time < timeout:
-            exchange, routing_key, body = self.pending_messages.pop(0)
-            self.try_publish(exchange, routing_key, body)
-
-    def try_publish(self, exchange, routing_key, body):
-        try:
-            self.channel.basic_publish(exchange=exchange, routing_key=routing_key, body=body, mandatory=True)
-        except pika.exceptions.UnroutableError:
-            self.pending_messages.append((exchange, routing_key, body))
-
-
     def start(self):
         self.channel.start_consuming()
 
