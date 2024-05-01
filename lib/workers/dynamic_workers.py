@@ -31,11 +31,11 @@ class DynamicWorker(Worker):
             for queue_prefix, routing_key in self.tmp_queues:
                 # 2 queues can suscribe to the same messages using the same routing_key, delegate that option to the user.
                 new_dst_queue = f"{queue_prefix}_{msg['request_id']}_queue"
-                self.channel.queue_declare(queue=new_dst_queue, durable=Ture)
+                self.channel.queue_declare(queue=new_dst_queue, durable=True)
                 if routing_key != '':
                     routing_key = f"{routing_key}_{msg['request_id']}"
                     self.channel.queue_bind(new_dst_queue, self.dst_exchange, routing_key=routing_key)
-        self.inner_callback(ch, method, properties, body)
+        self.inner_callback(ch, method, properties, msg)
 
 
 class DynamicRouter(DynamicWorker):

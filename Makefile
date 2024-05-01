@@ -24,6 +24,7 @@ docker-image:
 	docker build -f ./workers/fiction_title_sharder/Dockerfile -t "fiction_title_sharder:latest" .
 	docker build -f ./workers/title_sharder/Dockerfile -t "title_sharder:latest" .
 
+
 .PHONY: docker-image
 
 docker-image-client:

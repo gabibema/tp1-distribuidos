@@ -1,50 +1,58 @@
-from queue import Queue
 from socket import SOCK_STREAM, socket, AF_INET, create_connection
-from threading import Thread
+from multiprocessing import Process
+from time import time
 from lib.transfer.transfer_protocol import MESSAGE_FLAG, TransferProtocol
+from uuid import uuid4
 
+READ_MODE = 'r'
 BATCH_AMOUNT = 200
 
 class Client:
     def __init__(self, config):
         self.port = config['port']
-        self.conn = None
         
         self.books_path = config['books_path']
         self.ratings_path = config['ratings_path']
 
-        self.sender_queue = Queue()
-        self.file_sender = Thread(target=self.__send_files)
-        self.books_reader = Thread(target=self.__read_file(MESSAGE_FLAG['BOOK']))
-        self.ratings_reader = Thread(target=self.__read_file(MESSAGE_FLAG['RATING']))
+        self.uid = str(uuid4())
+        self.books_sender = Process(target=self.__send_file(MESSAGE_FLAG['BOOK'], self.books_path))
+        self.ratings_sender = Process(target=self.__send_file(MESSAGE_FLAG['RATING'], self.ratings_path))
+
 
     def start(self):
-        self.__start_socket()
-        self.file_sender.start()
-        self.books_reader.start()
-        self.ratings_reader.start()
+        self.books_sender.start()
+        self.ratings_sender.start()
+        self.books_sender.join()
+        self.ratings_sender.join()
+    
+    def __try_connect(self, host, port, timeout=15):
+        actual_time = time()
+        while time() - actual_time < timeout:
+            try:
+                conn = create_connection((host, port))
+                return conn
+            except:
+                pass
         
-    def __start_socket(self):
-        self.conn = create_connection(('gateway', self.port))
+        raise SystemError('Could not connect to the server')    # not handled at the moment
+        
+    def __send_file(self, flag, path):
+        conn = self.__try_connect('gateway', self.port)
+        protocol = TransferProtocol(conn)
 
-    def __read_file(self, flag):
-        with open(self.books_path, 'r') as file:
+        with open(path, READ_MODE) as file:
             headers = file.readline().strip()
-            batch = [headers]
+            batch = [self.uid,headers]
 
             for line in file:
-                batch.append(line.strip())
-                if len(batch) >= BATCH_AMOUNT:
-                    self.sender_queue.put((batch, flag))
-                    batch = [headers]
-                    
+               batch.append(line.strip())
+               if len(batch) >= BATCH_AMOUNT:
+                    protocol.send_message('\n'.join(batch), flag)
+                    batch = [self.uid,headers]
+                   
             if batch:            
-                self.sender_queue.put((batch, flag))
-        
-    def __send_files(self):
-        protocol = TransferProtocol(self.conn)
-        while True:
-            batch, flag = self.sender_queue.get()
-            protocol.send_message('\n'.join(batch), flag)
+               protocol.send_message('\n'.join(batch), flag)
+
+            protocol.send_message(self.uid, flag) # empty message to signal EOF
 
             

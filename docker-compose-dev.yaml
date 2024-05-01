@@ -3,22 +3,17 @@ services:
     image: rabbitmq:latest
     ports:
       - 15672:15672
-  client:
-    image: client:latest
-    entrypoint: python3 /app/main.py
-    volumes:
-      - ./config/client.ini:/app/config.ini
-      - ./lib:/app/lib
-      - ./data:/app/data
-    depends_on:
-      - rabbitmq
-    links:
-      - rabbitmq
+    restart: always
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 60s
+      retries: 5
+      start_period: 10s  
+
   gateway:
     image: gateway:latest
     entrypoint: python3 /app/main.py
-    depends_on:
-      - rabbitmq
     links:
       - rabbitmq
 
@@ -27,7 +22,8 @@ services:
     image: count_90s_revs_by_title:latest
     entrypoint: python3 /app/main.py
     depends_on:
-      - rabbitmq
+      rabbitmq: 
+        condition: service_healthy
     links:
       - rabbitmq
 
@@ -36,7 +32,8 @@ services:
     image: fiction_avg_nlp_by_title:latest
     entrypoint: python3 /app/main.py
     depends_on:
-      - rabbitmq
+      rabbitmq: 
+        condition: service_healthy
     links:
       - rabbitmq
 
@@ -45,7 +42,8 @@ services:
     image: fiction_title_barrier:latest
     entrypoint: python3 /app/main.py
     depends_on:
-      - rabbitmq
+      rabbitmq: 
+        condition: service_healthy
     links:
       - rabbitmq
     environment:
@@ -58,7 +56,8 @@ services:
     image: 90s_top10_filter:latest
     entrypoint: python3 /app/main.py
     depends_on:
-      - rabbitmq
+      rabbitmq: 
+        condition: service_healthy
     links:
       - rabbitmq
 
@@ -67,7 +66,8 @@ services:
     image: fiction_reviews_filter:latest
     entrypoint: python3 /app/main.py
     depends_on:
-      - rabbitmq
+      rabbitmq: 
+        condition: service_healthy
     links:
       - rabbitmq
     environment:
@@ -85,7 +85,8 @@ services:
     image: 90s_title_barrier:latest
     entrypoint: python3 /app/main.py
     depends_on:
-      - rabbitmq
+      rabbitmq: 
+        condition: service_healthy
     links:
       - rabbitmq
 
@@ -94,7 +95,8 @@ services:
     image: computer_books_filter:latest
     entrypoint: python3 /app/main.py
     depends_on:
-      - rabbitmq
+      rabbitmq: 
+        condition: service_healthy
     links:
       - rabbitmq
 
@@ -103,7 +105,8 @@ services:
     image: author_decades_filter:latest
     entrypoint: python3 /app/main.py
     depends_on:
-      - rabbitmq
+      rabbitmq: 
+        condition: service_healthy
     links:
       - rabbitmq
 
@@ -112,7 +115,8 @@ services:
     image: fiction_percentile_calculator:latest
     entrypoint: python3 /app/main.py
     depends_on:
-      - rabbitmq
+      rabbitmq: 
+        condition: service_healthy
     links:
       - rabbitmq
 
@@ -121,7 +125,8 @@ services:
     image: title_sharder:latest
     entrypoint: python3 /app/main.py
     depends_on:
-      - rabbitmq
+      rabbitmq: 
+        condition: service_healthy
     links:
       - rabbitmq
 
@@ -130,7 +135,8 @@ services:
     image: 90s_title_sharder:latest
     entrypoint: python3 /app/main.py
     depends_on:
-      - rabbitmq
+      rabbitmq: 
+        condition: service_healthy
     links:
       - rabbitmq
 
@@ -139,7 +145,8 @@ services:
     image: author_sharder:latest
     entrypoint: python3 /app/main.py
     depends_on:
-      - rabbitmq
+      rabbitmq: 
+        condition: service_healthy
     links:
       - rabbitmq
 
@@ -148,7 +155,8 @@ services:
     image: fiction_review_nlp:latest
     entrypoint: python3 /app/main.py
     depends_on:
-      - rabbitmq
+      rabbitmq: 
+        condition: service_healthy
     links:
       - rabbitmq
 
@@ -157,7 +165,8 @@ services:
     image: fiction_title_sharder:latest
     entrypoint: python3 /app/main.py
     depends_on:
-      - rabbitmq
+      rabbitmq: 
+        condition: service_healthy
     links:
       - rabbitmq
 
@@ -166,7 +175,8 @@ services:
     image: 90s_reviews_filter:latest
     entrypoint: python3 /app/main.py
     depends_on:
-      - rabbitmq
+      rabbitmq: 
+        condition: service_healthy
     links:
       - rabbitmq
 
@@ -175,6 +185,7 @@ services:
     image: fiction_percentile_filter:latest
     entrypoint: python3 /app/main.py
     depends_on:
-      - rabbitmq
+      rabbitmq: 
+        condition: service_healthy
     links:
       - rabbitmq

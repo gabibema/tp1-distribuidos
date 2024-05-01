@@ -29,7 +29,8 @@ def add_service_for_subdirectory(subdirectory, index, environment_config=""):
     image: {subdirectory}:latest
     entrypoint: python3 /app/main.py
     depends_on:
-      - rabbitmq
+      rabbitmq:
+        condition: service_healthy
     links:
       - rabbitmq{environment_config}
 """
@@ -78,22 +79,17 @@ services:
     image: rabbitmq:latest
     ports:
       - 15672:15672
-  client:
-    image: client:latest
-    entrypoint: python3 /app/main.py
-    volumes:
-      - ./config/client.ini:/app/config.ini
-      - ./lib:/app/lib
-      - ./data:/app/data
-    depends_on:
-      - rabbitmq
-    links:
-      - rabbitmq
+    restart: always
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 60s
+      retries: 5
+      start_period: 10s
+
   gateway:
     image: gateway:latest
     entrypoint: python3 /app/main.py
-    depends_on:
-      - rabbitmq
     links:
       - rabbitmq
 """
