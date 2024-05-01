@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from time import sleep
+from time import sleep, time
 from pika.exchange_type import ExchangeType
 import pika
 
@@ -12,6 +12,7 @@ class Worker(ABC):
         # init RabbitMQ channel
         connection = pika.BlockingConnection(pika.ConnectionParameters(host=rabbit_hostname))
         self.channel = connection.channel()
+        self.channel.confirm_delivery()
         # init source queue and bind to exchange
         self.channel.queue_declare(queue=src_queue, durable=True)
         self.channel.basic_consume(queue=src_queue, on_message_callback=self.callback)
@@ -23,6 +24,7 @@ class Worker(ABC):
             self.dst_exchange = dst_exchange
             self.channel.exchange_declare(exchange=dst_exchange, exchange_type=dst_exchange_type)
         self.routing_key = dst_routing_key
+        self.pending_messages = []
 
     def connect_to_peers(self):
         # set up control queues between workers that consume from the same queue
@@ -33,6 +35,22 @@ class Worker(ABC):
     def callback(self, ch, method, properties, body):
         'Callback given to a RabbitMQ queue to invoke for each message in the queue'
         pass
+
+    def check_pending_messages(self, timeout=5):
+        if len(self.pending_messages) == 0:
+            return
+        
+        start_time = time()
+        while time() - start_time < timeout:
+            exchange, routing_key, body = self.pending_messages.pop(0)
+            self.try_publish(exchange, routing_key, body)
+
+    def try_publish(self, exchange, routing_key, body):
+        try:
+            self.channel.basic_publish(exchange=exchange, routing_key=routing_key, body=body, mandatory=True)
+        except pika.exceptions.UnroutableError:
+            self.pending_messages.append((exchange, routing_key, body))
+
 
     def start(self):
         self.channel.start_consuming()
@@ -94,9 +112,21 @@ class Router(Worker):
             ch.basic_publish(exchange=self.dst_exchange, routing_key=routing_key, body=body)
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
-def wait_rabbitmq():
-    """Pauses execution for few seconds in order start rabbitmq broker."""
-    # this needs to be moved to the docker compose as a readiness probe
-    # we should first create rabbit, then workers, and finally start sending messages
-    sleep(WAIT_TIME_PIKA)
+
+def wait_rabbitmq(host='rabbitmq', timeout=120, interval=5):
+    """
+    Waits for RabbitMQ to be available.
+    """
+    start_time = time()
+    
+    while time() - start_time < timeout:
+        try:
+            connection = pika.BlockingConnection(pika.ConnectionParameters(host=host))
+            connection.close()
+            return
+        except pika.exceptions.AMQPConnectionError:
+            sleep(interval)
+
+    raise TimeoutError("RabbitMQ did not become available within the timeout period.")
+
 
