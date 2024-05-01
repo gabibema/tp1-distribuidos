@@ -62,7 +62,10 @@ class Map(Worker):
 
     def callback(self, ch, method, properties, body):
         'Callback given to a RabbitMQ queue to invoke for each message in the queue'
-        ch.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_key, body=self.map_fn(body))
+        if json.loads(body)['type'] == 'eof':
+            ch.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_key, body=body)
+        else:
+            ch.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_key, body=self.map_fn(body))
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
 
