@@ -46,9 +46,7 @@ class DynamicRouter(DynamicWorker):
     def inner_callback(self, ch, method, properties, body):
         'Callback given to a RabbitMQ queue to invoke for each message in the queue'
         msg = json.loads(body)
-        routing_keys = self.routing_fn(msg)
-        for routing_key in routing_keys:
-            ch.basic_publish(exchange=self.dst_exchange, routing_key=routing_key, body=body)
+        ch.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_fn(msg), body=body)
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
 
