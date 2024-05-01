@@ -22,7 +22,7 @@ def get_config_params():
     
     return config_params
 
-def initialize_log(level=logging.INFO):
+def initialize_log(level=logging.WARNING):
     logging.basicConfig(level=level, format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
 def main():
