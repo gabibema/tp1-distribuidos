@@ -71,6 +71,7 @@ class DynamicAggregate(DynamicWorker):
         for msg in self.result_fn(message, self.accumulator):
             routing_key = f"{self.routing_key}_{msg['request_id']}"
             self.channel.basic_publish(exchange=self.dst_exchange, routing_key=routing_key, body=msg)
+        self.channel.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_key, body=json.dumps({'request_id': message, 'type': 'eof'}))
 
 
 class DynamicFilter(Worker):
