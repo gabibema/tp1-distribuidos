@@ -1,14 +1,14 @@
 import json
 from lib.workers import Aggregate
 
-def aggregate(message, accumulator):
-    msg = json.loads(message)
+def aggregate(msg, accumulator):
     accumulator[msg['request_id']] = accumulator.get(msg['request_id'], [])
     accumulator[msg['request_id']].append(msg['Title'])
 
-def result(accumulator):
-    # Pending: When adding concurrent requests this should only return the result for the corresponding request_id
-    return [v for k,v in accumulator.items()][0]
+def result(msg, accumulator):
+    titles = accumulator.get(msg['request_id'], [])
+    del accumulator[msg['request_id']]
+    return [json.dumps({'request_id': msg['request_id'], 'titles': titles})]
 
 def main():
     """

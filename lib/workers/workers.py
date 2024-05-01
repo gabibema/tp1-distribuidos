@@ -74,11 +74,15 @@ class Aggregate(Worker):
 
     def callback(self, ch, method, properties, body):
         'Callback given to a RabbitMQ queue to invoke for each message in the queue'
-        self.aggregate_fn(body, self.accumulator)
+        msg = json.loads(body)
+        if msg['type'] == 'eof':
+            self.end(msg)
+        else:
+            self.aggregate_fn(msg, self.accumulator)
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
-    def end(self):
-        for msg in self.result_fn(self.accumulator):
+    def end(self, message):
+        for msg in self.result_fn(message, self.accumulator):
             self.channel.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_key, body=msg)
 
 

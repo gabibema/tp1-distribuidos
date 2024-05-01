@@ -5,14 +5,16 @@ from lib.workers import DynamicAggregate
 
 AvgAccumulator = namedtuple('AvgAccumulator', ['sum', 'count'])
 
-def aggregate(message, accumulator):
-    msg = json.loads(message)
-    old_values = accumulator.get(msg['Title'], AvgAccumulator(sum=0, count=0))
+def aggregate(msg, accumulator):
+    accumulator[msg['request_id']] = accumulator.get(msg['request_id'], {})
+    old_values = accumulator[msg['request_id']].get(msg['Title'], AvgAccumulator(sum=0, count=0))
     new_values = AvgAccumulator(sum=old_values.sum + msg['sentiment'], count=old_values.count + 1)
-    accumulator[msg['Title']] = new_values
+    accumulator[msg['request_id']][msg['Title']] = new_values
 
-def result(accumulator):
-    return [json.dumps({'Title': title, 'average': values.sum/values.count}) for title, values in accumulator.items()]
+def result(msg, accumulator):
+    acc = accumulator.get(msg['request_id'], {})
+    del accumulator[msg['request_id']]
+    return [json.dumps({'request_id': msg['request_id'], 'Title': title, 'average': values.sum/values.count}) for title, values in acc.items()]
 
 def main():
     # Pending: move variables to env.

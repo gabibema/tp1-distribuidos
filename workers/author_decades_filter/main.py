@@ -2,8 +2,7 @@ import json
 import logging
 from lib.workers import Aggregate
 
-def aggregate(message, accumulator):
-    msg = json.loads(message)
+def aggregate(msg, accumulator):
     date = msg['publishedDate']
     if not date:
         # skip books with invalid date
@@ -17,11 +16,14 @@ def aggregate(message, accumulator):
     # ignore brackets
     authors = msg['authors'][1:-1]
     for author in authors.split(','):
-        accumulator[author] = accumulator.get(author, set())
-        accumulator[author].add(decade)
+        accumulator[msg['request_id']] = accumulator.get(msg['request_id'], {})
+        accumulator[msg['request_id']][author] = accumulator[msg['request_id']].get(author, set())
+        accumulator[msg['request_id']][author].add(decade)
 
-def result(accumulator):
-    return [author for author, decades in accumulator.items() if len(decades) >= 10]
+def result(msg, accumulator):
+    authors = [author for author, decades in accumulator.get(msg['request_id'], {}).items() if len(decades) >= 10]
+    del accumulator[msg['request_id']]
+    return [json.dumps({'request_id': msg['request_id'], 'authors': authors})]
 
 def main():
     # Pending: move variables to env.

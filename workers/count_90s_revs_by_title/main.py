@@ -1,12 +1,14 @@
 import json
 from lib.workers import Aggregate
 
-def aggregate(message, accumulator):
-    msg = json.loads(message)
-    accumulator[msg['Title']] = accumulator.get(msg['Title'], 0) + 1
+def aggregate(msg, accumulator):
+    accumulator[msg['request_id']] = accumulator.get(msg['request_id'], {})
+    accumulator[msg['request_id']][msg['Title']] = accumulator[msg['request_id']].get(msg['Title'], 0) + 1
 
-def result(accumulator):
-    return [json.dumps({'Title': title, 'count': values.count}) for title, count in accumulator.items() if count >= 500]
+def result(msg, accumulator):
+    acc = accumulator.get(msg['request_id'], {})
+    del accumulator[msg['request_id']]
+    return [json.dumps({'request_id': msg['request_id'], 'Title': title, 'count': values.count}) for title, count in acc.items() if count >= 500]
 
 def main():
     # Pending: move variables to env.

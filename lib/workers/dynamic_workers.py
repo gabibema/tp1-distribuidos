@@ -15,7 +15,7 @@ class DynamicWorker(Worker):
         super().new(*args, **kwargs)
 
     @abstractmethod
-    def inner_callback(self, ch, method, properties, body):
+    def inner_callback(self, ch, method, properties, msg):
         pass
 
     def callback(self, ch, method, properties, body):
@@ -25,6 +25,7 @@ class DynamicWorker(Worker):
         """
         # Pending: if msg is an EOF, remove request from self.ongoing_requests
         # if there's no queues for this request_id, create them.
+        msg = json.loads(body)
         if msg['request_id'] not in self.ongoing_requests:
             # create queues and subscribe them to dst_exchange
             for queue_prefix, routing_key in self.tmp_queues:
@@ -59,11 +60,15 @@ class DynamicAggregate(DynamicWorker):
 
     def inner_callback(self, ch, method, properties, body):
         'Callback given to a RabbitMQ queue to invoke for each message in the queue'
-        self.aggregate_fn(body, self.accumulator)
+        msg = json.loads(body)
+        if msg['type'] == 'eof':
+            self.end(msg)
+        else:
+            self.aggregate_fn(msg, self.accumulator)
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
-    def end(self):
-        for msg in self.result_fn(self.accumulator):
+    def end(self, message):
+        for msg in self.result_fn(message, self.accumulator):
             routing_key = f"{self.routing_key}_{msg['request_id']}"
             self.channel.basic_publish(exchange=self.dst_exchange, routing_key=routing_key, body=msg)
 

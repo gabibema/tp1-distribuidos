@@ -3,13 +3,16 @@ import random
 from pika.exchange_type import ExchangeType
 from lib.workers import Aggregate
 
-def aggregate(message, accumulator):
-    msg = json.loads(message)
-    accumulator.append(msg['average'])
+def aggregate(msg, accumulator):
+    accumulator[msg['request_id']] = accumulator.get(msg['request_id'], [])
+    accumulator[msg['request_id']].append(msg['average'])
 
-def result(accumulator):
-    percentile_10_idx = len(accumulator) / 10
-    return kth_smallest(percentile_10_idx, accumulator, 0, len(accumulator) - 1)
+def result(msg, accumulator):
+    acc = accumulator.get(msg['request_id'], [])
+    percentile_10_idx = len(acc) / 10
+    percentile = kth_smallest(percentile_10_idx, acc, 0, len(acc) - 1)
+    del accumulator[msg['request_id']]
+    return [json.dumps({'request_id': msg['request_id'], 'percentile': percentile})]
 
 def kth_smallest(k, buffer, start, end):
     "Find the Kth smallest value in O(n) time"
@@ -60,7 +63,7 @@ def main():
     src_exchange = 'avg_nlp_exchange'
     dst_exchange = 'nlp_percentile_exchange'
     dst_routing_key = 'nlp_percentile_queue'
-    accumulator = []
+    accumulator = {}
     worker = Aggregate(aggregate, result, accumulator, rabbit_hostname, src_queue, src_exchange, src_exchange_type=ExchangeType.topic, src_routing_key='#', dst_exchange=dst_exchange, dst_routing_key=dst_routing_key)
     worker.start()
 
