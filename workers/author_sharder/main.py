@@ -17,7 +17,7 @@ def main():
     # Pending: move variables to env.
     # Pending: update SHARD_COUNT variable to match the env.
     rabbit_hostname = 'rabbitmq'
-    src_queue = 'book_queue'
+    src_queue = 'authors_book_queue'
     src_exchange = 'books_exchange'
     src_routing_key = '#'
     dst_exchange = 'authors_sharded_exchange'
