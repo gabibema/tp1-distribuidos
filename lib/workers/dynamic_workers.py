@@ -61,7 +61,7 @@ class DynamicAggregate(DynamicWorker):
     def inner_callback(self, ch, method, properties, body):
         'Callback given to a RabbitMQ queue to invoke for each message in the queue'
         msg = json.loads(body)
-        if msg['type'] == 'eof':
+        if msg['type'] == 'EOF':
             self.end(msg)
         else:
             self.aggregate_fn(msg, self.accumulator)
@@ -95,7 +95,7 @@ class DynamicFilter(Worker):
         ch.queue_declare(queue=new_tmp_queue, durable=True)
         ch.basic_consume(queue=new_tmp_queue, on_message_callback=self.filter_callback)
 
-    def client_eof(self, body):
+    def client_EOF(self, body):
         msg = json.loads(body)
         self.state = self.update_state(self.state, msg)
         tmp_queue = f"{self.tmp_queues_prefix}_{msg['request_id']}_queue"
@@ -103,8 +103,8 @@ class DynamicFilter(Worker):
 
     def filter_callback(self, ch, method, properties, body):
         'Callback used to filter messages in a queue'
-        if json.loads(body).get('type') == 'eof':
-            self.client_eof(body)
+        if json.loads(body).get('type') == 'EOF':
+            self.client_EOF(body)
             ch.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_key, body=body)
         elif self.filter_condition(self.state, body):
             ch.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_key, body=body)
