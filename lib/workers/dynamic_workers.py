@@ -61,7 +61,7 @@ class DynamicAggregate(DynamicWorker):
     def inner_callback(self, ch, method, properties, body):
         'Callback given to a RabbitMQ queue to invoke for each message in the queue'
         msg = json.loads(body)
-        if msg['type'] == 'EOF':
+        if msg.get('type') == 'EOF':
             self.end(msg)
         else:
             self.aggregate_fn(msg, self.accumulator)

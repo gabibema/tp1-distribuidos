@@ -50,7 +50,7 @@ class Filter(Worker):
 
     def callback(self, ch, method, properties, body):
         'Callback given to a RabbitMQ queue to invoke for each message in the queue'
-        if self.filter_condition(body) or json.loads(body)['type'] == 'EOF':
+        if self.filter_condition(body) or json.loads(body).get('type') == 'EOF':
             ch.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_key, body=body)
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
@@ -62,7 +62,7 @@ class Map(Worker):
 
     def callback(self, ch, method, properties, body):
         'Callback given to a RabbitMQ queue to invoke for each message in the queue'
-        if json.loads(body)['type'] == 'EOF':
+        if json.loads(body).get('type') == 'EOF':
             ch.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_key, body=body)
         else:
             ch.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_key, body=self.map_fn(body))
@@ -79,7 +79,7 @@ class Aggregate(Worker):
     def callback(self, ch, method, properties, body):
         'Callback given to a RabbitMQ queue to invoke for each message in the queue'
         msg = json.loads(body)
-        if msg['type'] == 'EOF':
+        if msg.get('type') == 'EOF':
             self.end(msg)
         else:
             self.aggregate_fn(msg, self.accumulator)
