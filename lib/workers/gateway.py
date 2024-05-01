@@ -23,7 +23,7 @@ class Proxy(Worker):
             self.try_publish(exchange, keys, dumps(row))
         
         if not processed_row:
-            self.try_publish(exchange, 'eof', dumps({'request_id': uid}))
+            self.try_publish(exchange, 'eof', dumps({'request_id': uid, 'type': 'EOF'}))
 
 
     def get_keys(self, row, exchange):
