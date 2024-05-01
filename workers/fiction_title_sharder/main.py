@@ -18,7 +18,7 @@ def main():
     rabbit_hostname = 'rabbitmq'
     src_queue = 'fiction_queue'
     src_exchange = 'books_exchange'
-    src_routing_key = '#.fiction.#'
+    src_routing_key = '#'
     dst_exchange = 'fiction_books_sharded_exchange'
     dst_routing_key = 'fiction_books'
     worker = Router(routing_fn, rabbit_hostname, src_queue, src_exchange, src_routing_key, ExchangeType.topic, dst_exchange, dst_routing_key)

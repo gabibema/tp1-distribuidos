@@ -19,7 +19,7 @@ def main():
     rabbit_hostname = 'rabbitmq'
     src_queue = '90s_queue'
     src_exchange = 'books_exchange'
-    src_routing_key = '#.1.9.9.*'
+    src_routing_key = '1990'
     dst_exchange = '90s_books_sharded_exchange'
     dst_routing_key = '90s_books'
     worker = Router(routing_fn, rabbit_hostname, src_queue, src_exchange, src_routing_key, ExchangeType.topic, dst_exchange, dst_routing_key)

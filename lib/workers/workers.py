@@ -8,7 +8,7 @@ WAIT_TIME_PIKA=5
 
 class Worker(ABC):
 
-    def new(self, rabbit_hostname, src_queue='', src_exchange='', src_routing_key='', src_exchange_type=ExchangeType.direct, dst_exchange='', dst_routing_key=None, dst_exchange_type=ExchangeType.direct):
+    def new(self, rabbit_hostname, src_queue='', src_exchange='', src_routing_key=[''], src_exchange_type=ExchangeType.direct, dst_exchange='', dst_routing_key=None, dst_exchange_type=ExchangeType.direct):
         wait_rabbitmq()
         # init RabbitMQ channel
         connection = pika.BlockingConnection(pika.ConnectionParameters(host=rabbit_hostname))
@@ -19,7 +19,10 @@ class Worker(ABC):
         self.channel.basic_consume(queue=src_queue, on_message_callback=self.callback)
         if src_exchange:
             self.channel.exchange_declare(src_exchange, exchange_type=src_exchange_type)
-            self.channel.queue_bind(src_queue, src_exchange, routing_key=src_routing_key)
+            if type(src_routing_key) == str:
+                src_routing_key = [src_routing_key]
+            for routing_key in src_routing_key:
+                self.channel.queue_bind(src_queue, src_exchange, routing_key=routing_key)
         if src_exchange_type == ExchangeType.topic:
             self.channel.queue_bind(src_queue, src_exchange, routing_key='EOF')
         # init destination exchange
