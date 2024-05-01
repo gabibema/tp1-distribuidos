@@ -19,6 +19,7 @@ docker-image:
 	docker build -f ./workers/fiction_percentile_calculator/Dockerfile -t "fiction_percentile_calculator:latest" .
 	docker build -f ./workers/fiction_percentile_filter/Dockerfile -t "fiction_percentile_filter:latest" .
 	docker build -f ./workers/fiction_review_nlp/Dockerfile -t "fiction_review_nlp:latest" .
+	docker build -f ./workers/fiction_category_filter/Dockerfile -t "fiction_category_filter:latest" .
 	docker build -f ./workers/fiction_reviews_filter/Dockerfile -t "fiction_reviews_filter:latest" .
 	docker build -f ./workers/fiction_title_barrier/Dockerfile -t "fiction_title_barrier:latest" .
 	docker build -f ./workers/fiction_title_sharder/Dockerfile -t "fiction_title_sharder:latest" .
