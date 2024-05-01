@@ -8,7 +8,7 @@ def aggregate(msg, accumulator):
 
 def result(msg, accumulator):
     request_titles = accumulator.pop(msg['request_id'], [])
-    return [json.dumps({'request_id': msg['request_id'], 'top10': [msg[1] for msg in nlargest(10, request_titles)]})]
+    return json.dumps({'request_id': msg['request_id'], 'top10': [msg[1] for msg in nlargest(10, request_titles)]})
 
 def main():
     # Pending: move variables to env.

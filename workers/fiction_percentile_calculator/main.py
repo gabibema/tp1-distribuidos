@@ -11,7 +11,7 @@ def result(msg, accumulator):
     acc = accumulator.pop(msg['request_id'], [])
     percentile_10_idx = len(acc) / 10
     percentile = kth_smallest(percentile_10_idx, acc, 0, len(acc) - 1)
-    return [json.dumps({'request_id': msg['request_id'], 'percentile': percentile})]
+    return json.dumps({'request_id': msg['request_id'], 'percentile': percentile})
 
 def kth_smallest(k, buffer, start, end):
     "Find the Kth smallest value in O(n) time"

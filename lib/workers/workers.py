@@ -92,8 +92,8 @@ class Aggregate(Worker):
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
     def end(self, message):
-        for msg in self.result_fn(message, self.accumulator):
-            self.channel.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_key, body=msg)
+        msg = self.result_fn(message, self.accumulator)
+        self.channel.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_key, body=msg)
         self.channel.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_key, body=json.dumps(message))
 
 

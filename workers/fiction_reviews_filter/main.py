@@ -1,8 +1,10 @@
 import json
+import logging
 from pika.exchange_type import ExchangeType
 from lib.workers import DynamicFilter
 
 def update_state(old_state, message):
+    logging.warning(json.dumps(message))
     if message.get('type') == 'EOF':
         # delete info that was required to process the request, which has been fulfilled
         old_state.pop(message['request_id'], None)
@@ -12,7 +14,7 @@ def update_state(old_state, message):
 
 def filter_condition(state, body):
     msg = json.loads(body)
-    # if Book's average review NLP is greater than the 10th percentile from state
+    # if review is in the list of fiction titles
     return msg['Title'] in state[msg['request_id']]
 
 def main():
@@ -25,6 +27,7 @@ def main():
     dst_exchange = 'fiction_rev_exchange'
     dst_routing_key = f'fiction_rev_shard{shard_id}'
     tmp_queues_prefix = f'fiction_reviews_shard{shard_id}'
+    logging.basicConfig(level=logging.WARNING, format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
     worker = DynamicFilter(update_state, filter_condition, tmp_queues_prefix, rabbit_hostname, src_queue, src_exchange, src_routing_key, ExchangeType.direct, dst_exchange, dst_routing_key)
     worker.start()
 
