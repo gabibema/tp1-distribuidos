@@ -1,5 +1,6 @@
 from io import StringIO
 from csv import DictReader
+import logging
 import json
 import pika
 from .workers import wait_rabbitmq
@@ -29,8 +30,11 @@ class BookPublisher():
             routing_key = routing_key_fn(row)
             self.channel.basic_publish(exchange=self.exchange, routing_key=routing_key, body=json.dumps(row))
         if not processed_row:
+            eof_msg = json.dumps({'request_id': uid, 'type': 'EOF'})
+            logging.warning(f'{eof_msg}')
             self.channel.basic_publish(exchange=self.exchange, routing_key='EOF', body=json.dumps({'request_id': uid, 'type': 'EOF'}))
-
+        else: 
+            logging.warning(f'Received message of length {len(message)}')
 
 class ReviewPublisher():
     def __init__(self, rabbit_hostname):
@@ -45,10 +49,13 @@ class ReviewPublisher():
         uid = csv_stream.readline().strip()
         reader = DictReader(csv_stream)
 
-        processed_row = False
-        for row in reader:
-            processed_row = True
-            row['request_id'] = uid
-            self.channel.basic_publish(exchange='', routing_key=routing_key, body=json.dumps(row))
-        if not processed_row:
-            self.channel.basic_publish(exchange='', routing_key=routing_key, body=json.dumps({'request_id': uid, 'type': 'EOF'}))
+        rows = [{'request_id': uid, **row} for row in reader]
+
+        if not rows:
+            eof_msg = json.dumps({'request_id': uid, 'type': 'EOF'})
+            logging.warning(f'{eof_msg}')
+            self.channel.basic_publish(exchange='', routing_key=routing_key, body=eof_msg)
+        else:
+            full_message = json.dumps(rows)
+            self.channel.basic_publish(exchange='', routing_key=routing_key, body=full_message)
+            logging.warning(f'Received message of length {len(message)}')

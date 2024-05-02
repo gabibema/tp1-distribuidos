@@ -58,6 +58,7 @@ class Client:
                 queue.put((flag, '\n'.join(batch)))
 
             # Signal EOF
+            print("Sending EOF")
             queue.put((flag, self.uid))
 
     def __sending_completed(self, books_queue: Queue, reviews_queue: Queue):
@@ -75,5 +76,5 @@ class Client:
                 flag, message = reviews_queue.get()
                 protocol.send_message(message, flag)
             
-            if self.__sending_completed(books_queue, reviews_queue):
-                break
+            #if self.__sending_completed(books_queue, reviews_queue):
+            #    break
