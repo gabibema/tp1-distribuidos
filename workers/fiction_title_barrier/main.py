@@ -7,7 +7,7 @@ def aggregate(msg, accumulator):
 
 def result(msg, accumulator):
     titles = accumulator.pop(msg['request_id'], [])
-    return [json.dumps({'request_id': msg['request_id'], 'titles': titles})]
+    return json.dumps({'request_id': msg['request_id'], 'titles': titles})
 
 def main():
     """

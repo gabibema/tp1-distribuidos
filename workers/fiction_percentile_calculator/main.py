@@ -11,7 +11,7 @@ def result(msg, accumulator):
     acc = accumulator.pop(msg['request_id'], [])
     percentile_10_idx = len(acc) / 10
     percentile = kth_smallest(percentile_10_idx, acc, 0, len(acc) - 1)
-    return [json.dumps({'request_id': msg['request_id'], 'percentile': percentile})]
+    return json.dumps({'request_id': msg['request_id'], 'percentile': percentile})
 
 def kth_smallest(k, buffer, start, end):
     "Find the Kth smallest value in O(n) time"
@@ -60,10 +60,11 @@ def main():
     rabbit_hostname = 'rabbitmq'
     src_queue = 'avg_nlp_queue'
     src_exchange = 'avg_nlp_exchange'
+    src_routing_key = '#'
     dst_exchange = 'nlp_percentile_exchange'
     dst_routing_key = 'nlp_percentile_queue'
     accumulator = {}
-    worker = Aggregate(aggregate, result, accumulator, rabbit_hostname, src_queue, src_exchange, src_exchange_type=ExchangeType.topic, src_routing_key='#', dst_exchange=dst_exchange, dst_routing_key=dst_routing_key)
+    worker = Aggregate(aggregate, result, accumulator, rabbit_hostname, src_queue, src_exchange, src_routing_key, ExchangeType.topic, dst_exchange, dst_routing_key)
     worker.start()
 
 if __name__ == '__main__':

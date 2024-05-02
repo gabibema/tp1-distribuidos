@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from time import sleep, time
 import json
+import logging
 from pika.exchange_type import ExchangeType
 import pika
 
@@ -56,6 +57,8 @@ class Filter(Worker):
 
     def callback(self, ch, method, properties, body):
         'Callback given to a RabbitMQ queue to invoke for each message in the queue'
+        if json.loads(body).get('type') == 'EOF':
+            logging.warning(json.loads(body))
         if json.loads(body).get('type') == 'EOF' or self.filter_condition(body):
             ch.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_key, body=body)
         ch.basic_ack(delivery_tag=method.delivery_tag)
@@ -69,6 +72,7 @@ class Map(Worker):
     def callback(self, ch, method, properties, body):
         'Callback given to a RabbitMQ queue to invoke for each message in the queue'
         if json.loads(body).get('type') == 'EOF':
+            logging.warning(json.loads(body))
             ch.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_key, body=body)
         else:
             ch.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_key, body=self.map_fn(body))
@@ -84,17 +88,20 @@ class Aggregate(Worker):
 
     def callback(self, ch, method, properties, body):
         'Callback given to a RabbitMQ queue to invoke for each message in the queue'
-        msg = json.loads(body)
-        if msg.get('type') == 'EOF':
-            self.end(msg)
-        else:
-            self.aggregate_fn(msg, self.accumulator)
+        messages = json.loads(body)
+        if type(messages) != list:
+            messages = [messages]
+        for msg in messages:
+            if msg.get('type') == 'EOF':
+                logging.warning(json.loads(body))
+                self.end(msg)
+            else:
+                self.aggregate_fn(msg, self.accumulator)
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
     def end(self, message):
-        for msg in self.result_fn(message, self.accumulator):
-            self.channel.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_key, body=msg)
-        self.channel.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_key, body=json.dumps(message))
+        msg = self.result_fn(message, self.accumulator)
+        self.channel.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_key, body=msg)
 
 
 class Router(Worker):
@@ -104,13 +111,15 @@ class Router(Worker):
 
     def callback(self, ch, method, properties, body):
         'Callback given to a RabbitMQ queue to invoke for each message in the queue'
+        if json.loads(body).get('type') == 'EOF':
+            logging.warning(json.loads(body))
         routing_keys = self.routing_fn(body)
         for routing_key in routing_keys:
             ch.basic_publish(exchange=self.dst_exchange, routing_key=routing_key, body=body)
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
 
-def wait_rabbitmq(host='rabbitmq', timeout=120, interval=5):
+def wait_rabbitmq(host='rabbitmq', timeout=120, interval=10):
     """
     Waits for RabbitMQ to be available.
     """
