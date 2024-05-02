@@ -89,11 +89,14 @@ class Aggregate(Worker):
     def callback(self, ch, method, properties, body):
         'Callback given to a RabbitMQ queue to invoke for each message in the queue'
         msg = json.loads(body)
-        if msg.get('type') == 'EOF':
-            logging.warning(json.loads(body))
-            self.end(msg)
-        else:
-            self.aggregate_fn(msg, self.accumulator)
+        if type(msg) != list:
+            messages = [msg]
+        for msg in messages:
+            if msg.get('type') == 'EOF':
+                logging.warning(json.loads(body))
+                self.end(msg)
+            else:
+                self.aggregate_fn(msg, self.accumulator)
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
     def end(self, message):

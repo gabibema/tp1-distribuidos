@@ -7,8 +7,8 @@ def aggregate(msg, accumulator):
 
 def result(msg, accumulator):
     acc = accumulator.pop(msg['request_id'], {})
-    popular_books = [{'Title': title, 'count': values.count} for title, count in acc.items() if count >= 500]
-    return json.dumps({'request_id': msg['request_id'], 'popular_books': popular_books })
+    popular_books = [{'request_id': msg['request_id'], 'Title': title, 'count': count} for title, count in acc.items() if count >= 500]
+    return json.dumps(popular_books)
 
 def main():
     # Pending: move variables to env.

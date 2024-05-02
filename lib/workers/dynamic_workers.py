@@ -44,7 +44,7 @@ class DynamicWorker(Worker):
                 self.channel.queue_bind(new_dst_queue, self.dst_exchange, routing_key=routing_key)
 
     def delete_queues(self, request_id):
-        self.ongoing_requests.discard(msg['request_id'])
+        self.ongoing_requests.discard(request_id)
         for queue_prefix, _routing_key in self.tmp_queues:
             tmp_queue = f"{queue_prefix}_{request_id}_queue"
             self.channel.queue_delete(queue=tmp_queue)
@@ -70,9 +70,8 @@ class DynamicAggregate(DynamicWorker):
         self.accumulator = accumulator
         self.new(*args, **kwargs)
 
-    def inner_callback(self, ch, method, properties, body):
+    def inner_callback(self, ch, method, properties, msg):
         'Callback given to a RabbitMQ queue to invoke for each message in the queue'
-        message = json.loads(body)
         if msg.get('type') == 'EOF':
             self.end(msg)
         else:
@@ -81,9 +80,9 @@ class DynamicAggregate(DynamicWorker):
 
     def end(self, message):
         messages = self.result_fn(message, self.accumulator)
-        routing_key = f"{self.routing_key}_{msg['request_id']}"
         for msg in messages:
-            self.channel.basic_publish(exchange=self.dst_exchange, routing_key=routing_key, body=msg)
+            routing_key = f"{self.routing_key}_{msg['request_id']}"
+            self.channel.basic_publish(exchange=self.dst_exchange, routing_key=routing_key, body=json.dumps(msg))
 
 
 class DynamicFilter(Worker):
@@ -117,9 +116,9 @@ class DynamicFilter(Worker):
     def filter_callback(self, ch, method, properties, body):
         'Callback used to filter messages in a queue'
         msg = json.loads(body)
-        if self.filter_condition(self.state, msg):
-            ch.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_key, body=json.dumps(msg))
-        elif msg.get('type') == 'EOF':
+        if msg.get('type') == 'EOF':
             self.client_EOF(body)
+            ch.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_key, body=json.dumps(msg))
+        elif self.filter_condition(self.state, msg):
             ch.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_key, body=json.dumps(msg))
         ch.basic_ack(delivery_tag=method.delivery_tag)
