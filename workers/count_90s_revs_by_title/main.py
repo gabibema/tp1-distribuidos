@@ -12,13 +12,13 @@ def result(msg, accumulator):
 
 def main():
     # Pending: move variables to env.
+    shard_id = 0
     rabbit_hostname = 'rabbitmq'
-    src_queue = '90s_rev_queue'
-    src_exchange = '90s_rev_exchange'
+    src_queue = f'90s_rev_shard{shard_id}_queue'
     dst_exchange = 'popular_90s_exchange'
     dst_routing_key = 'popular_90s_queue'
     accumulator = {}
-    worker = Aggregate(aggregate, result, accumulator, rabbit_hostname, src_queue, src_exchange, dst_exchange=dst_exchange, dst_routing_key=dst_routing_key)
+    worker = Aggregate(aggregate, result, accumulator, rabbit_hostname, src_queue, dst_exchange=dst_exchange, dst_routing_key=dst_routing_key)
     worker.start()
 
 if __name__ == '__main__':
