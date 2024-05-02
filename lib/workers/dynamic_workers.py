@@ -23,21 +23,27 @@ class DynamicWorker(Worker):
         Wrapper to create tmp_queues before invoking the actual callback.
         This is to ensure that the callback fn will always publish to an existing queue.
         """
-        messages = json.loads(body) 
-        if not messages:
-            return
-        msg = messages[0]
+        message = json.loads(body)
+        msg = message[-1] if type(message) == list else message
         if msg['request_id'] not in self.ongoing_requests:
-            for queue_prefix, routing_key in self.tmp_queues:
-                new_dst_queue = f"{queue_prefix}_{msg['request_id']}_queue"
-                self.channel.queue_declare(queue=new_dst_queue, durable=True)
-                if routing_key != '':
-                    routing_key = f"{routing_key}_{msg['request_id']}"
-                    self.channel.queue_bind(new_dst_queue, self.dst_exchange, routing_key=routing_key)
-        self.inner_callback(ch, method, properties, messages)
-        eof_msgs = [None for msg in messages if msg.get('type') == 'EOF']
-        if eof_msgs:
-            self.ongoing_requests.discard(msg['request_id'])
+            self.create_queues(msg['request_id'])
+        self.inner_callback(ch, method, properties, message)
+        if msg.get('type') == 'EOF':
+            self.delete_queues(msg['request_id'])
+
+    def create_queues(self, request_id):
+        for queue_prefix, routing_key in self.tmp_queues:
+            new_dst_queue = f"{queue_prefix}_{request_id}_queue"
+            self.channel.queue_declare(queue=new_dst_queue, durable=True)
+            if routing_key != '':
+                routing_key = f"{routing_key}_{request_id}"
+                self.channel.queue_bind(new_dst_queue, self.dst_exchange, routing_key=routing_key)
+
+    def delete_queues(self, request_id):
+        self.ongoing_requests.discard(msg['request_id'])
+        for queue_prefix, _routing_key in self.tmp_queues:
+            tmp_queue = f"{queue_prefix}_{request_id}_queue"
+            self.channel.queue_delete(queue=tmp_queue)
 
 
 class DynamicRouter(DynamicWorker):
@@ -61,19 +67,17 @@ class DynamicAggregate(DynamicWorker):
 
     def inner_callback(self, ch, method, properties, body):
         'Callback given to a RabbitMQ queue to invoke for each message in the queue'
-        messages = json.loads(body)
-        for msg in messages:
-            if msg.get('type') == 'EOF':
-                self.end(msg)
-            else:
-                self.aggregate_fn(msg, self.accumulator)
-            ch.basic_ack(delivery_tag=method.delivery_tag)
+        message = json.loads(body)
+        if msg.get('type') == 'EOF':
+            self.end(msg)
+        else:
+            self.aggregate_fn(msg, self.accumulator)
+        ch.basic_ack(delivery_tag=method.delivery_tag)
 
     def end(self, message):
-        for msg in self.result_fn(message, self.accumulator):
-            routing_key = f"{self.routing_key}_{msg['request_id']}"
-            self.channel.basic_publish(exchange=self.dst_exchange, routing_key=routing_key, body=msg)
-        self.channel.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_key, body=json.dumps(message))
+        msg = self.result_fn(message, self.accumulator)
+        routing_key = f"{self.routing_key}_{msg['request_id']}"
+        self.channel.basic_publish(exchange=self.dst_exchange, routing_key=routing_key, body=msg)
 
 
 class DynamicFilter(Worker):
