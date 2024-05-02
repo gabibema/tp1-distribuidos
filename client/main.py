@@ -11,6 +11,7 @@ def get_config_params():
         config_params = {
             'books_path': os.getenv('BOOKS_PATH', default=config['DEFAULT'].get('BOOKS_PATH')),
             'reviews_path': os.getenv('REVIEWS_PATH', default=config['DEFAULT'].get('REVIEWS_PATH')),
+            'batch_amount': int(os.getenv('BATCH_AMOUNT', default=config['DEFAULT'].get('BATCH_AMOUNT'))),
             'port': int(os.getenv('PORT', default=config['DEFAULT'].get('PORT'))),
             'log_level': os.getenv('LOG_LEVEL', default=config['DEFAULT'].get('LOG_LEVEL')),
         }

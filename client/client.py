@@ -5,11 +5,11 @@ from lib.transfer.transfer_protocol import MESSAGE_FLAG, TransferProtocol
 from uuid import uuid4
 
 READ_MODE = 'r'
-BATCH_AMOUNT = 200
 
 class Client:
     def __init__(self, config):
         self.port = config['port']
+        self.batch_amount = config['batch_amount']
         
         self.books_path = config['books_path']
         self.reviews_path = config['reviews_path']
@@ -50,7 +50,7 @@ class Client:
 
             for line in file:
                 batch.append(line.strip())
-                if len(batch) >= BATCH_AMOUNT:
+                if len(batch) >= self.batch_amount:
                     queue.put((flag, '\n'.join(batch)))
                     batch = [self.uid, headers]
 
