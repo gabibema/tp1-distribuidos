@@ -5,7 +5,9 @@ from typing import Tuple
 MESSAGE_FLAG = {
     'BOOK': '1',
     'REVIEW': '2',
-    'ERROR': '3'
+    'RESULT': '3',
+    'EOF': '4',
+    'ERROR': '5'
 }
 
 SIZE_DELIMETER = ';'

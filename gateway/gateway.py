@@ -5,6 +5,7 @@ from socket import SOCK_STREAM, socket, AF_INET
 from pika.exchange_type import ExchangeType
 from lib.gateway import BookPublisher, ResultReceiver, ReviewPublisher, MAX_KEY_LENGTH
 from lib.transfer.transfer_protocol import MESSAGE_FLAG, TransferProtocol
+from lib.workers.workers import wait_rabbitmq
 
 CLIENTS_BACKLOG = 5
 
@@ -17,12 +18,12 @@ class Gateway:
     def start(self):
         self.conn = socket(AF_INET, SOCK_STREAM)
         self.conn.bind(('', self.port))
-        #self.__wait_workers()
+        wait_rabbitmq()
+        self.__wait_workers()
 
 
         self.book_publisher = BookPublisher('rabbitmq', 'books_exchange', ExchangeType.topic)
         self.review_publisher = ReviewPublisher('rabbitmq')
-        #self.result_receiver = ResultReceiver('rabbitmq', )
 
         while True:
             self.conn.listen(CLIENTS_BACKLOG)
@@ -32,15 +33,23 @@ class Gateway:
 
     def __handle_client(self, client):
         protocol = TransferProtocol(client)
-        # Pending: declare resources once when Gateway is created.
-        # declare queues for reading query results.
+        eof_count = 0
 
         while True:
             message, flag = protocol.receive_message()
+                
             if flag == MESSAGE_FLAG['BOOK']:
-                self.book_publisher.publish(message, get_books_keys)
+                eof_count += self.book_publisher.publish(message, get_books_keys)
             elif flag == MESSAGE_FLAG['REVIEW']:
-                self.review_publisher.publish(message, 'reviews_queue')
+                eof_count += self.review_publisher.publish(message, 'reviews_queue')
+            
+            if eof_count == 2:
+                break
+
+        logging.warning('EOF received from both files')
+        result_receiver = ResultReceiver('rabbitmq', self.result_queues, callback_result_client, protocol)
+        result_receiver.start()
+
 
     def __wait_workers(self):
         book_publisher = BookPublisher('rabbitmq', 'books_exchange', ExchangeType.topic)
@@ -55,6 +64,15 @@ class Gateway:
 
         result_receiver.close()
 
+
+def callback_result_client(ch, method, properties, body, queue_name, callback_arg: TransferProtocol):
+    body = json.loads(body)
+
+    if 'type' in body:
+        callback_arg.send_message(json.dumps({'file': queue_name}), MESSAGE_FLAG['EOF'])
+    else:
+        callback_arg.send_message(json.dumps({'file':queue_name, 'body':body}), MESSAGE_FLAG['RESULT'])
+    
 
 def callback_result(ch, method, properties, body, queue_name, callback_arg):
     body = json.loads(body)
