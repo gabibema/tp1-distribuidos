@@ -3,6 +3,7 @@ from csv import DictReader
 import logging
 import json
 import pika
+import logging
 from .workers import wait_rabbitmq
 from pika.exchange_type import ExchangeType
 
@@ -44,6 +45,7 @@ class BookPublisher():
         self.channel.close()
         self.connection.close()
 
+
 class ReviewPublisher():
     def __init__(self, rabbit_hostname):
         wait_rabbitmq()
@@ -55,9 +57,7 @@ class ReviewPublisher():
         csv_stream = StringIO(message)
         uid = csv_stream.readline().strip()
         reader = DictReader(csv_stream)
-
         rows = [{'request_id': uid, **row} for row in reader]
-
         if not rows:
             eof_msg = json.dumps({'request_id': uid, 'type': 'EOF'})
             logging.warning(f'{eof_msg}')
@@ -72,6 +72,7 @@ class ReviewPublisher():
     def close(self):
         self.channel.close()
         self.connection.close()
+
 
 class ResultReceiver():
     def __init__(self, rabbit_hostname, queues, callback, callback_arg):
