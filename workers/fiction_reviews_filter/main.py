@@ -1,4 +1,3 @@
-import json
 import logging
 from pika.exchange_type import ExchangeType
 from lib.workers import DynamicFilter
@@ -12,8 +11,7 @@ def update_state(old_state, message):
         old_state[message['request_id']] = set(message['titles'])
     return old_state
 
-def filter_condition(state, body):
-    msg = json.loads(body)
+def filter_condition(state, msg):
     # if review is in the list of fiction titles
     return msg['Title'] in state[msg['request_id']]
 
