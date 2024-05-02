@@ -55,7 +55,7 @@ class ReviewPublisher():
         reader = DictReader(csv_stream)
         rows = [{'request_id': uid, **row} for row in reader]
         if not rows:
-            eof_msg = json.dumps({'request_id': uid, 'type': 'EOF'})
+            eof_msg = json.dumps([{'request_id': uid, 'type': 'EOF'}])
             logging.warning(f'{eof_msg}')
             self.channel.basic_publish(exchange='', routing_key=routing_key, body=eof_msg)
         else:
