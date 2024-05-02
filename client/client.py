@@ -60,6 +60,9 @@ class Client:
             # Signal EOF
             queue.put((flag, self.uid))
 
+    def __sending_completed(self, books_queue: Queue, reviews_queue: Queue):
+        return books_queue.empty() and reviews_queue.empty() and not self.books_sender.is_alive() and not self.reviews_sender.is_alive()
+
     def __send_from_queue(self, books_queue: Queue, reviews_queue: Queue):
         conn = self.__try_connect('gateway', self.port)
         protocol = TransferProtocol(conn)
@@ -71,3 +74,6 @@ class Client:
             if not reviews_queue.empty():
                 flag, message = reviews_queue.get()
                 protocol.send_message(message, flag)
+            
+            if self.__sending_completed(books_queue, reviews_queue):
+                break
