@@ -13,7 +13,7 @@ EOF_VALUE = 1
 
 class BookPublisher():
     def __init__(self, rabbit_hostname, dst_exchange, dst_exchange_type):
-        wait_rabbitmq()
+
         # init RabbitMQ channel
         self.connection = pika.BlockingConnection(pika.ConnectionParameters(host=rabbit_hostname))
         self.channel = self.connection.channel()
@@ -48,7 +48,6 @@ class BookPublisher():
 
 class ReviewPublisher():
     def __init__(self, rabbit_hostname):
-        wait_rabbitmq()
         # init RabbitMQ channel
         self.connection = pika.BlockingConnection(pika.ConnectionParameters(host=rabbit_hostname))
         self.channel = self.connection.channel()
@@ -76,7 +75,6 @@ class ReviewPublisher():
 
 class ResultReceiver():
     def __init__(self, rabbit_hostname, queues, callback, callback_arg):
-        wait_rabbitmq()
         # init RabbitMQ channel
         self.callback = callback
         self.callback_arg = callback_arg

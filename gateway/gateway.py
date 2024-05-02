@@ -5,6 +5,7 @@ from socket import SOCK_STREAM, socket, AF_INET
 from pika.exchange_type import ExchangeType
 from lib.gateway import BookPublisher, ResultReceiver, ReviewPublisher, MAX_KEY_LENGTH
 from lib.transfer.transfer_protocol import MESSAGE_FLAG, TransferProtocol
+from lib.workers.workers import wait_rabbitmq
 
 CLIENTS_BACKLOG = 5
 
@@ -17,6 +18,7 @@ class Gateway:
     def start(self):
         self.conn = socket(AF_INET, SOCK_STREAM)
         self.conn.bind(('', self.port))
+        wait_rabbitmq()
         self.__wait_workers()
 
 

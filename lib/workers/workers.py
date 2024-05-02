@@ -116,7 +116,7 @@ class Router(Worker):
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
 
-def wait_rabbitmq(host='rabbitmq', timeout=120, interval=5):
+def wait_rabbitmq(host='rabbitmq', timeout=120, interval=10):
     """
     Waits for RabbitMQ to be available.
     """
