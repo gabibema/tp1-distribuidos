@@ -2,6 +2,7 @@ from io import StringIO
 from csv import DictReader
 import json
 import pika
+import logging
 from .workers import wait_rabbitmq
 
 MAX_KEY_LENGTH = 255
@@ -29,7 +30,9 @@ class BookPublisher():
             routing_key = routing_key_fn(row)
             self.channel.basic_publish(exchange=self.exchange, routing_key=routing_key, body=json.dumps(row))
         if not processed_row:
-            self.channel.basic_publish(exchange=self.exchange, routing_key='EOF', body=json.dumps({'request_id': uid, 'type': 'EOF'}))
+            eof_msg = json.dumps({'request_id': uid, 'type': 'EOF'})
+            logging.warning(f'{eof_msg}')
+            self.channel.basic_publish(exchange=self.exchange, routing_key='EOF', body=eof_msg)
 
 
 class ReviewPublisher():
@@ -51,4 +54,6 @@ class ReviewPublisher():
             row['request_id'] = uid
             self.channel.basic_publish(exchange='', routing_key=routing_key, body=json.dumps(row))
         if not processed_row:
-            self.channel.basic_publish(exchange='', routing_key=routing_key, body=json.dumps({'request_id': uid, 'type': 'EOF'}))
+            eof_msg = json.dumps({'request_id': uid, 'type': 'EOF'})
+            logging.warning(f'{eof_msg}')
+            self.channel.basic_publish(exchange='', routing_key=routing_key, body=eof_msg)
