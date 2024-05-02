@@ -22,7 +22,6 @@ class Gateway:
 
         self.book_publisher = BookPublisher('rabbitmq', 'books_exchange', ExchangeType.topic)
         self.review_publisher = ReviewPublisher('rabbitmq')
-        #self.result_receiver = ResultReceiver('rabbitmq', )
 
         while True:
             self.conn.listen(CLIENTS_BACKLOG)
@@ -32,15 +31,23 @@ class Gateway:
 
     def __handle_client(self, client):
         protocol = TransferProtocol(client)
-        # Pending: declare resources once when Gateway is created.
-        # declare queues for reading query results.
+        eof_count = 0
 
         while True:
             message, flag = protocol.receive_message()
+                
             if flag == MESSAGE_FLAG['BOOK']:
-                self.book_publisher.publish(message, get_books_keys)
+                eof_count += self.book_publisher.publish(message, get_books_keys)
             elif flag == MESSAGE_FLAG['REVIEW']:
-                self.review_publisher.publish(message, 'reviews_queue')
+                eof_count += self.review_publisher.publish(message, 'reviews_queue')
+            
+            if eof_count == 2:
+                break
+
+        logging.warning('EOF received from both files')
+        result_receiver = ResultReceiver('rabbitmq', self.result_queues, callback_result_client, protocol)
+        result_receiver.start()
+
 
     def __wait_workers(self):
         book_publisher = BookPublisher('rabbitmq', 'books_exchange', ExchangeType.topic)
@@ -55,6 +62,12 @@ class Gateway:
 
         result_receiver.close()
 
+
+def callback_result_client(ch, method, properties, body, queue_name, callback_arg: TransferProtocol):
+    body = json.loads(body)
+    logging.warning(f'Received message of length {len(body)} from {queue_name}: {body}')
+    callback_arg.send_message(json.dumps({'file':queue_name, 'body':body}), MESSAGE_FLAG['RESULT'])
+    
 
 def callback_result(ch, method, properties, body, queue_name, callback_arg):
     body = json.loads(body)

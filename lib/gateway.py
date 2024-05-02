@@ -7,6 +7,8 @@ from .workers import wait_rabbitmq
 from pika.exchange_type import ExchangeType
 
 MAX_KEY_LENGTH = 255
+NOT_EOF_VALUE = 0
+EOF_VALUE = 1
 
 class BookPublisher():
     def __init__(self, rabbit_hostname, dst_exchange, dst_exchange_type):
@@ -35,6 +37,8 @@ class BookPublisher():
             self.channel.basic_publish(exchange=self.exchange, routing_key='EOF', body=json.dumps({'request_id': uid, 'type': 'EOF'}))
         else: 
             logging.warning(f'Received message of length {len(message)}')
+        
+        return EOF_VALUE if not processed_row else NOT_EOF_VALUE
     
     def close(self):
         self.channel.close()
@@ -62,6 +66,8 @@ class ReviewPublisher():
             full_message = json.dumps(rows)
             self.channel.basic_publish(exchange='', routing_key=routing_key, body=full_message)
             logging.warning(f'Received message of length {len(message)}')
+        
+        return EOF_VALUE if not rows else NOT_EOF_VALUE
     
     def close(self):
         self.channel.close()
