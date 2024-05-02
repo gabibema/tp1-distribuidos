@@ -98,10 +98,13 @@ class DynamicFilter(Worker):
         'Callback used to update the internal state, to change how future messages are filtered'
         msg = json.loads(body)
         self.state = self.update_state(self.state, msg)
-        # If there is a new client, subscribe to the new queue
-        new_tmp_queue = f"{self.tmp_queues_prefix}_{msg['request_id']}_queue"
-        ch.queue_declare(queue=new_tmp_queue, durable=True)
-        ch.basic_consume(queue=new_tmp_queue, on_message_callback=self.filter_callback)
+        # Ignore EOFs through this queue. Each client will send their EOF through the tmp queue.
+        if msg.get('type') != 'EOF':
+            # If there is a new client, subscribe to the new queue
+            new_tmp_queue = f"{self.tmp_queues_prefix}_{msg['request_id']}_queue"
+            ch.queue_declare(queue=new_tmp_queue, durable=True)
+            ch.basic_consume(queue=new_tmp_queue, on_message_callback=self.filter_callback)
+        ch.basic_ack(delivery_tag=method.delivery_tag)
 
     def client_EOF(self, body):
         msg = json.loads(body)
