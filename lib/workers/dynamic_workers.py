@@ -24,18 +24,20 @@ class DynamicWorker(Worker):
         This is to ensure that the callback fn will always publish to an existing queue.
         """
         messages = json.loads(body) 
-        for msg in messages:
-            if msg['request_id'] not in self.ongoing_requests:
-                for queue_prefix, routing_key in self.tmp_queues:
-                    new_dst_queue = f"{queue_prefix}_{msg['request_id']}_queue"
-                    self.channel.queue_declare(queue=new_dst_queue, durable=True)
-                    if routing_key != '':
-                        routing_key = f"{routing_key}_{msg['request_id']}"
-                        self.channel.queue_bind(new_dst_queue, self.dst_exchange, routing_key=routing_key)
-            if 'type' in msg and msg['type'] == 'EOF':
-                self.ongoing_requests.remove(msg['request_id']) #check if this is the correct way to remove the request_id
+        if not messages:
+            return
+        msg = messages[0]
+        if msg['request_id'] not in self.ongoing_requests:
+            for queue_prefix, routing_key in self.tmp_queues:
+                new_dst_queue = f"{queue_prefix}_{msg['request_id']}_queue"
+                self.channel.queue_declare(queue=new_dst_queue, durable=True)
+                if routing_key != '':
+                    routing_key = f"{routing_key}_{msg['request_id']}"
+                    self.channel.queue_bind(new_dst_queue, self.dst_exchange, routing_key=routing_key)
         self.inner_callback(ch, method, properties, messages)
-
+        eof_msgs = [None for msg in messages if msg.get('type') == 'EOF']
+        if eof_msgs:
+            self.ongoing_requests.discard(msg['request_id'])
 
 
 class DynamicRouter(DynamicWorker):
@@ -43,7 +45,6 @@ class DynamicRouter(DynamicWorker):
         self.routing_fn = routing_fn
         self.new(*args, **kwargs)
 
-class DynamicRouter(DynamicWorker):
     def inner_callback(self, ch, method, properties, messages):
         'Callback given to a RabbitMQ queue to invoke for each message in the queue'
         for msg in messages:
