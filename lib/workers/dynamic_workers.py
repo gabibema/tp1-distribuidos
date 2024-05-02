@@ -58,7 +58,8 @@ class DynamicRouter(DynamicWorker):
     def inner_callback(self, ch, method, properties, messages):
         'Callback given to a RabbitMQ queue to invoke for each message in the queue'
         for msg in messages:
-            ch.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_fn(msg), body=json.dumps(msg))
+            for routing_key in self.routing_fn(msg):
+                ch.basic_publish(exchange=self.dst_exchange, routing_key=routing_key, body=json.dumps(msg))
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
 
@@ -79,9 +80,10 @@ class DynamicAggregate(DynamicWorker):
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
     def end(self, message):
-        msg = self.result_fn(message, self.accumulator)
+        messages = self.result_fn(message, self.accumulator)
         routing_key = f"{self.routing_key}_{msg['request_id']}"
-        self.channel.basic_publish(exchange=self.dst_exchange, routing_key=routing_key, body=msg)
+        for msg in messages:
+            self.channel.basic_publish(exchange=self.dst_exchange, routing_key=routing_key, body=msg)
 
 
 class DynamicFilter(Worker):
