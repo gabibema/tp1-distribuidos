@@ -4,8 +4,8 @@ from lib.workers import Filter
 
 def category_filter(body):
     msg = json.loads(body)
-    for category in msg['categories']:
-        if 'fiction' in category.split(' '):
+    for word in msg['categories'].split(' '):
+        if 'fiction' == word.strip('\'"[],'):
             return True
     else:
         return False
