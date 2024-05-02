@@ -88,9 +88,9 @@ class Aggregate(Worker):
 
     def callback(self, ch, method, properties, body):
         'Callback given to a RabbitMQ queue to invoke for each message in the queue'
-        msg = json.loads(body)
-        if type(msg) != list:
-            messages = [msg]
+        messages = json.loads(body)
+        if type(messages) != list:
+            messages = [messages]
         for msg in messages:
             if msg.get('type') == 'EOF':
                 logging.warning(json.loads(body))

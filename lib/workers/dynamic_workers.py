@@ -33,7 +33,9 @@ class DynamicWorker(Worker):
         self.inner_callback(ch, method, properties, message)
         if msg.get('type') == 'EOF':
             logging.warning(json.loads(body))
-            self.delete_queues(msg['request_id'])
+            self.ongoing_requests.discard(msg['request_id'])
+            # DON'T delete queues yet! messages need to be consumed.
+            # queues should be deleted by consumer after reading the EOF.
 
     def create_queues(self, request_id):
         for queue_prefix, routing_key in self.tmp_queues:
@@ -42,12 +44,6 @@ class DynamicWorker(Worker):
             if routing_key != '':
                 routing_key = f"{routing_key}_{request_id}"
                 self.channel.queue_bind(new_dst_queue, self.dst_exchange, routing_key=routing_key)
-
-    def delete_queues(self, request_id):
-        self.ongoing_requests.discard(request_id)
-        for queue_prefix, _routing_key in self.tmp_queues:
-            tmp_queue = f"{queue_prefix}_{request_id}_queue"
-            self.channel.queue_delete(queue=tmp_queue)
 
 
 class DynamicRouter(DynamicWorker):
@@ -117,8 +113,9 @@ class DynamicFilter(Worker):
         'Callback used to filter messages in a queue'
         msg = json.loads(body)
         if msg.get('type') == 'EOF':
-            self.client_EOF(body)
             ch.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_key, body=json.dumps(msg))
+            ch.basic_ack(delivery_tag=method.delivery_tag)
+            self.client_EOF(body)
         elif self.filter_condition(self.state, msg):
             ch.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_key, body=json.dumps(msg))
-        ch.basic_ack(delivery_tag=method.delivery_tag)
+            ch.basic_ack(delivery_tag=method.delivery_tag)
