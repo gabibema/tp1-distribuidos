@@ -1,4 +1,5 @@
 import json
+import logging
 from abc import abstractmethod
 from .workers import Worker
 
@@ -26,6 +27,8 @@ class DynamicWorker(Worker):
         # Pending: if msg is an EOF, remove request from self.ongoing_requests
         # if there's no queues for this request_id, create them.
         msg = json.loads(body)
+        if msg.get('type') == 'EOF':
+            logging.warning(json.loads(body))
         if msg['request_id'] not in self.ongoing_requests:
             # create queues and subscribe them to dst_exchange
             for queue_prefix, routing_key in self.tmp_queues:
@@ -46,7 +49,8 @@ class DynamicRouter(DynamicWorker):
     def inner_callback(self, ch, method, properties, body):
         'Callback given to a RabbitMQ queue to invoke for each message in the queue'
         msg = json.loads(body)
-        ch.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_fn(msg), body=body)
+        for routing_key in self.routing_fn(msg):
+            ch.basic_publish(exchange=self.dst_exchange, routing_key=routing_key, body=body)
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
 
