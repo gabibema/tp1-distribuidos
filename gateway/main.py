@@ -9,8 +9,7 @@ def get_config_params():
 
     try:
         config_params = {
-            'books_exchange': os.getenv('BOOKS_EXCHANGE', default=config['DEFAULT'].get('BOOKS_EXCHANGE')),
-            'ratings_exchange': os.getenv('RATINGS_EXCHANGE', default=config['DEFAULT'].get('RATINGS_EXCHANGE')),
+            'result_queues': config['DEFAULT'].get('RESULT_QUEUES').split(','),
             'port': int(os.getenv('PORT', default=config['DEFAULT'].get('PORT'))),
             'log_level': os.getenv('LOG_LEVEL', default=config['DEFAULT'].get('LOG_LEVEL')),
         }

@@ -26,19 +26,28 @@ class DynamicWorker(Worker):
         """
         # Pending: if msg is an EOF, remove request from self.ongoing_requests
         # if there's no queues for this request_id, create them.
-        msg = json.loads(body)
+        message = json.loads(body)
+        msg = message[-1] if type(message) == list else message
+        if msg['request_id'] not in self.ongoing_requests:
+            self.create_queues(msg['request_id'])
+        self.inner_callback(ch, method, properties, message)
         if msg.get('type') == 'EOF':
             logging.warning(json.loads(body))
-        if msg['request_id'] not in self.ongoing_requests:
-            # create queues and subscribe them to dst_exchange
-            for queue_prefix, routing_key in self.tmp_queues:
-                # 2 queues can suscribe to the same messages using the same routing_key, delegate that option to the user.
-                new_dst_queue = f"{queue_prefix}_{msg['request_id']}_queue"
-                self.channel.queue_declare(queue=new_dst_queue, durable=True)
-                if routing_key != '':
-                    routing_key = f"{routing_key}_{msg['request_id']}"
-                    self.channel.queue_bind(new_dst_queue, self.dst_exchange, routing_key=routing_key)
-        self.inner_callback(ch, method, properties, body)
+            self.delete_queues(msg['request_id'])
+
+    def create_queues(self, request_id):
+        for queue_prefix, routing_key in self.tmp_queues:
+            new_dst_queue = f"{queue_prefix}_{request_id}_queue"
+            self.channel.queue_declare(queue=new_dst_queue, durable=True)
+            if routing_key != '':
+                routing_key = f"{routing_key}_{request_id}"
+                self.channel.queue_bind(new_dst_queue, self.dst_exchange, routing_key=routing_key)
+
+    def delete_queues(self, request_id):
+        self.ongoing_requests.discard(msg['request_id'])
+        for queue_prefix, _routing_key in self.tmp_queues:
+            tmp_queue = f"{queue_prefix}_{request_id}_queue"
+            self.channel.queue_delete(queue=tmp_queue)
 
 
 class DynamicRouter(DynamicWorker):
@@ -46,11 +55,10 @@ class DynamicRouter(DynamicWorker):
         self.routing_fn = routing_fn
         self.new(*args, **kwargs)
 
-    def inner_callback(self, ch, method, properties, body):
+    def inner_callback(self, ch, method, properties, messages):
         'Callback given to a RabbitMQ queue to invoke for each message in the queue'
-        msg = json.loads(body)
-        for routing_key in self.routing_fn(msg):
-            ch.basic_publish(exchange=self.dst_exchange, routing_key=routing_key, body=body)
+        for msg in messages:
+            ch.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_fn(msg), body=json.dumps(msg))
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
 
@@ -63,7 +71,7 @@ class DynamicAggregate(DynamicWorker):
 
     def inner_callback(self, ch, method, properties, body):
         'Callback given to a RabbitMQ queue to invoke for each message in the queue'
-        msg = json.loads(body)
+        message = json.loads(body)
         if msg.get('type') == 'EOF':
             self.end(msg)
         else:
@@ -71,10 +79,9 @@ class DynamicAggregate(DynamicWorker):
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
     def end(self, message):
-        for msg in self.result_fn(message, self.accumulator):
-            routing_key = f"{self.routing_key}_{msg['request_id']}"
-            self.channel.basic_publish(exchange=self.dst_exchange, routing_key=routing_key, body=msg)
-        self.channel.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_key, body=json.dumps(message))
+        msg = self.result_fn(message, self.accumulator)
+        routing_key = f"{self.routing_key}_{msg['request_id']}"
+        self.channel.basic_publish(exchange=self.dst_exchange, routing_key=routing_key, body=msg)
 
 
 class DynamicFilter(Worker):
@@ -107,9 +114,10 @@ class DynamicFilter(Worker):
 
     def filter_callback(self, ch, method, properties, body):
         'Callback used to filter messages in a queue'
-        if json.loads(body).get('type') == 'EOF':
+        msg = json.loads(body)
+        if self.filter_condition(self.state, msg):
+            ch.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_key, body=json.dumps(msg))
+        elif msg.get('type') == 'EOF':
             self.client_EOF(body)
-            ch.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_key, body=body)
-        elif self.filter_condition(self.state, body):
-            ch.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_key, body=body)
+            ch.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_key, body=json.dumps(msg))
         ch.basic_ack(delivery_tag=method.delivery_tag)

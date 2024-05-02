@@ -14,9 +14,7 @@ def aggregate(msg, accumulator):
 
 def result(msg, accumulator):
     acc = accumulator.pop(msg['request_id'], {})
-    average_by_title = [json.dumps({'request_id': msg['request_id'], 'Title': title, 'average': values.sum/values.count}) for title, values in acc.items()]
-    logging.warning(average_by_title[:3])
-    return average_by_title
+    return json.dumps({'request_id': msg['request_id'], 'Title': title, 'average': values.sum/values.count}) for title, values in acc.items()
 
 def main():
     # Pending: move variables to env.
