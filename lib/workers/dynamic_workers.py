@@ -1,4 +1,5 @@
 import json
+import logging
 from abc import abstractmethod
 from .workers import Worker
 
@@ -23,12 +24,15 @@ class DynamicWorker(Worker):
         Wrapper to create tmp_queues before invoking the actual callback.
         This is to ensure that the callback fn will always publish to an existing queue.
         """
+        # Pending: if msg is an EOF, remove request from self.ongoing_requests
+        # if there's no queues for this request_id, create them.
         message = json.loads(body)
         msg = message[-1] if type(message) == list else message
         if msg['request_id'] not in self.ongoing_requests:
             self.create_queues(msg['request_id'])
         self.inner_callback(ch, method, properties, message)
         if msg.get('type') == 'EOF':
+            logging.warning(json.loads(body))
             self.delete_queues(msg['request_id'])
 
     def create_queues(self, request_id):

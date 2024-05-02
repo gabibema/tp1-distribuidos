@@ -7,7 +7,7 @@ def routing_fn(msg):
         return [f"reviews_shard{shard_id}_{msg['request_id']}" for shard_id in range(SHARD_COUNT)]
     else:
         shard_id = hash(msg['Title']) % SHARD_COUNT
-        return f"reviews_shard{shard_id}_{msg['request_id']}"
+        return [f"reviews_shard{shard_id}_{msg['request_id']}"]
 
 def main():
     # Pending: move variables to env.
