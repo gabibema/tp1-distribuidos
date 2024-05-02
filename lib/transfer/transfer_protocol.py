@@ -6,7 +6,8 @@ MESSAGE_FLAG = {
     'BOOK': '1',
     'REVIEW': '2',
     'RESULT': '3',
-    'ERROR': '4'
+    'EOF': '4',
+    'ERROR': '5'
 }
 
 SIZE_DELIMETER = ';'

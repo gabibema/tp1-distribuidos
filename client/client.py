@@ -8,6 +8,7 @@ from lib.transfer.transfer_protocol import MESSAGE_FLAG, TransferProtocol
 from uuid import uuid4
 
 READ_MODE = 'r'
+RESULT_FILES_AMOUNT = 5
 
 class Client:
     def __init__(self, config):
@@ -64,8 +65,6 @@ class Client:
             if batch:
                 queue.put((flag, '\n'.join(batch)))
 
-            # Signal EOF
-            print("Sending EOF")
             queue.put((flag, self.uid))
 
     def __sending_completed(self, books_queue: Queue, reviews_queue: Queue):
@@ -87,11 +86,18 @@ class Client:
     
     def __save_results(self):
         protocol = TransferProtocol(self.conn)
+        eof_count = 0
         while True:
             message, flag = protocol.receive_message()
-            if flag == MESSAGE_FLAG['RESULT']:
+            if flag == MESSAGE_FLAG['EOF']:
+                eof_count += 1
+            elif flag == MESSAGE_FLAG['RESULT']:
                 body = loads(message)
                 self.__save_in_file(body['file'], body['body'])
+            
+            if eof_count == RESULT_FILES_AMOUNT:
+                break
+
 
     def __save_in_file(self, filename, body):
         print(f"Saving body: {body}")
