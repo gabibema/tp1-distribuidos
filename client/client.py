@@ -1,10 +1,14 @@
+from csv import DictWriter
+from json import dumps, loads
+import os
 from socket import SOCK_STREAM, socket, AF_INET, create_connection
-from multiprocessing import Process, Queue
+from multiprocessing import Process, Queue, Value
 from time import time
 from lib.transfer.transfer_protocol import MESSAGE_FLAG, TransferProtocol
 from uuid import uuid4
 
 READ_MODE = 'r'
+RESULT_FILES_AMOUNT = 5
 
 class Client:
     def __init__(self, config):
@@ -14,23 +18,27 @@ class Client:
         self.books_path = config['books_path']
         self.reviews_path = config['reviews_path']
 
+        self.output_dir = config['output_dir']
         self.uid = str(uuid4())
 
         self.books_queue = Queue()
         self.reviews_queue = Queue()
         self.books_sender = Process(target=self.__enqueue_file, args=(MESSAGE_FLAG['BOOK'], self.books_path, self.books_queue))
         self.reviews_sender = Process(target=self.__enqueue_file, args=(MESSAGE_FLAG['REVIEW'], self.reviews_path, self.reviews_queue))
-        self.sender_process = Process(target=self.__send_from_queue, args=(self.books_queue, self.reviews_queue))
+
+
 
 
     def start(self):
         self.books_sender.start()
         self.reviews_sender.start()
-        self.sender_process.start()
         
+        self.conn = self.__try_connect('gateway', self.port)
+        self.__send_from_queue(self.books_queue, self.reviews_queue)
         self.books_sender.join()
         self.reviews_sender.join()
-        self.sender_process.join()
+        self.__save_results()
+        
     
     def __try_connect(self, host, port, timeout=15):
         actual_time = time()
@@ -57,16 +65,13 @@ class Client:
             if batch:
                 queue.put((flag, '\n'.join(batch)))
 
-            # Signal EOF
-            print("Sending EOF")
             queue.put((flag, self.uid))
 
     def __sending_completed(self, books_queue: Queue, reviews_queue: Queue):
         return books_queue.empty() and reviews_queue.empty() and not self.books_sender.is_alive() and not self.reviews_sender.is_alive()
 
     def __send_from_queue(self, books_queue: Queue, reviews_queue: Queue):
-        conn = self.__try_connect('gateway', self.port)
-        protocol = TransferProtocol(conn)
+        protocol = TransferProtocol(self.conn)
         
         while True:
             if not books_queue.empty():
@@ -76,5 +81,36 @@ class Client:
                 flag, message = reviews_queue.get()
                 protocol.send_message(message, flag)
             
-            #if self.__sending_completed(books_queue, reviews_queue):
-            #    break
+            if self.__sending_completed(books_queue, reviews_queue):
+                break
+    
+    def __save_results(self):
+        protocol = TransferProtocol(self.conn)
+        eof_count = 0
+        while True:
+            message, flag = protocol.receive_message()
+            if flag == MESSAGE_FLAG['EOF']:
+                eof_count += 1
+            elif flag == MESSAGE_FLAG['RESULT']:
+                body = loads(message)
+                self.__save_in_file(body['file'], body['body'])
+            
+            if eof_count == RESULT_FILES_AMOUNT:
+                break
+
+
+    def __save_in_file(self, filename, body):
+        print(f"Saving body: {body}")
+        filepath = os.path.join(self.output_dir, f'{filename}.csv')
+        
+        file_exists = os.path.isfile(filepath)
+        
+        if isinstance(body, dict):
+            body = [body]  
+        
+        with open(filepath, 'a+', newline='') as file:
+            writer = DictWriter(file, fieldnames=body[0].keys())
+            if not file_exists or file.tell() == 0:
+                writer.writeheader()
+            
+            writer.writerows(body)
