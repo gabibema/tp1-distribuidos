@@ -6,7 +6,7 @@ def aggregate(msg, accumulator):
     if type(msg) != list:
         msg = [msg]
     accumulator[msg[0]['request_id']] = accumulator.get(msg[0]['request_id'], [])
-    accumulator[book['request_id']].extend(msg)
+    accumulator[msg[0]['request_id']].extend(msg)
 
 def result(msg, accumulator):
     request_titles = accumulator.pop(msg['request_id'], [])
