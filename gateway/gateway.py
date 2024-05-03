@@ -54,14 +54,14 @@ class Gateway:
     def __wait_workers(self):
         book_publisher = BookPublisher('rabbitmq', 'books_exchange', ExchangeType.topic)
         review_publisher = ReviewPublisher('rabbitmq')
+        result_receiver = ResultReceiver('rabbitmq', self.result_queues, callback_result, self.result_queues.copy())
+
         book_publisher.publish('EOF', get_books_keys)
         review_publisher.publish('EOF', 'reviews_queue')
         book_publisher.close()
         review_publisher.close()
-
-        result_receiver = ResultReceiver('rabbitmq', self.result_queues, callback_result, self.result_queues.copy())
+        
         result_receiver.start()
-
         result_receiver.close()
 
 
