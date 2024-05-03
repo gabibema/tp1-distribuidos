@@ -56,8 +56,8 @@ class Gateway:
         review_publisher = ReviewPublisher('rabbitmq')
         result_receiver = ResultReceiver('rabbitmq', self.result_queues, callback_result, self.result_queues.copy())
 
-        book_publisher.publish('EOF', get_books_keys)
-        review_publisher.publish('EOF', 'reviews_queue')
+        book_publisher.publish('', get_books_keys)
+        review_publisher.publish('', 'reviews_queue')
         book_publisher.close()
         review_publisher.close()
         
@@ -77,10 +77,8 @@ def callback_result_client(ch, method, properties, body, queue_name, callback_ar
 def callback_result(ch, method, properties, body, queue_name, callback_arg):
     body = json.loads(body)
     logging.warning(f'Received message of length {len(body)} from {queue_name}: {body}')
-    
-    if body['type'] == 'EOF':
-        callback_arg.remove(queue_name)
-    
+
+    callback_arg.remove(queue_name)
     if not callback_arg:
         ch.stop_consuming()
 
