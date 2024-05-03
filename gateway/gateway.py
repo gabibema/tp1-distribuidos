@@ -78,6 +78,9 @@ def callback_result(ch, method, properties, body, queue_name, callback_arg):
     body = json.loads(body)
     logging.warning(f'Received message of length {len(body)} from {queue_name}: {body}')
 
+    if 'type' in body and body['type'] == 'EOF':
+        callback_arg.remove(queue_name)
+
     callback_arg.remove(queue_name)
     if not callback_arg:
         ch.stop_consuming()
