@@ -19,7 +19,7 @@ class Gateway:
         self.conn = socket(AF_INET, SOCK_STREAM)
         self.conn.bind(('', self.port))
         wait_rabbitmq()
-        #self.__wait_workers()
+        self.__wait_workers()
 
 
         self.book_publisher = BookPublisher('rabbitmq', 'books_exchange', ExchangeType.topic)

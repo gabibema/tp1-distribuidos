@@ -74,11 +74,13 @@ class DynamicAggregate(DynamicWorker):
             self.aggregate_fn(msg, self.accumulator)
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
-    def end(self, message):
-        messages = self.result_fn(message, self.accumulator)
+    def end(self, eof_message):
+        messages = self.result_fn(eof_message, self.accumulator)
         for msg in messages:
             routing_key = f"{self.routing_key}_{msg['request_id']}"
             self.channel.basic_publish(exchange=self.dst_exchange, routing_key=routing_key, body=json.dumps(msg))
+        routing_key = f"{self.routing_key}_{eof_message['request_id']}"
+        self.channel.basic_publish(exchange=self.dst_exchange, routing_key=routing_key, body=json.dumps(eof_message))
 
 
 class DynamicFilter(Worker):

@@ -99,9 +99,11 @@ class Aggregate(Worker):
                 self.aggregate_fn(msg, self.accumulator)
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
-    def end(self, message):
-        msg = self.result_fn(message, self.accumulator)
+    def end(self, eof_message):
+        logging.warning(f'{self.dst_exchange=}, {self.routing_key=}')
+        msg = self.result_fn(eof_message, self.accumulator)
         self.channel.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_key, body=msg)
+        self.channel.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_key, body=json.dumps(eof_message))
 
 
 class Router(Worker):
