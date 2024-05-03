@@ -99,14 +99,18 @@ class Client:
                 break
 
 
-    def __save_in_file(self, filename, body):
-        print(f"Saving body: {body}")
+    def __save_in_file(self, filename, body: dict):
         filepath = os.path.join(self.output_dir, f'{filename}.csv')
-        
         file_exists = os.path.isfile(filepath)
         
         if isinstance(body, dict):
-            body = [body]  
+            if 'request_id' in body:
+                body.pop('request_id')
+            body = [body]
+        else: 
+            for row in body:
+                if 'request_id' in row:
+                    row.pop('request_id')
         
         with open(filepath, 'a+', newline='') as file:
             writer = DictWriter(file, fieldnames=body[0].keys())

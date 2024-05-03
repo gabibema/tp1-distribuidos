@@ -14,7 +14,7 @@ class Worker(ABC):
         # init RabbitMQ channel
         connection = pika.BlockingConnection(pika.ConnectionParameters(host=rabbit_hostname))
         self.channel = connection.channel()
-        self.channel.confirm_delivery()
+        self.channel.basic_qos(prefetch_count=50, global_qos=True)
         # init source queue and bind to exchange
         self.channel.queue_declare(queue=src_queue, durable=True)
         self.channel.basic_consume(queue=src_queue, on_message_callback=self.callback)
@@ -99,9 +99,11 @@ class Aggregate(Worker):
                 self.aggregate_fn(msg, self.accumulator)
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
-    def end(self, message):
-        msg = self.result_fn(message, self.accumulator)
+    def end(self, eof_message):
+        logging.warning(f'{self.dst_exchange=}, {self.routing_key=}')
+        msg = self.result_fn(eof_message, self.accumulator)
         self.channel.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_key, body=msg)
+        self.channel.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_key, body=json.dumps(eof_message))
 
 
 class Router(Worker):

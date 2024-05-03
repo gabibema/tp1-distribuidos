@@ -74,11 +74,13 @@ class DynamicAggregate(DynamicWorker):
             self.aggregate_fn(msg, self.accumulator)
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
-    def end(self, message):
-        messages = self.result_fn(message, self.accumulator)
+    def end(self, eof_message):
+        messages = self.result_fn(eof_message, self.accumulator)
         for msg in messages:
             routing_key = f"{self.routing_key}_{msg['request_id']}"
             self.channel.basic_publish(exchange=self.dst_exchange, routing_key=routing_key, body=json.dumps(msg))
+        routing_key = f"{self.routing_key}_{eof_message['request_id']}"
+        self.channel.basic_publish(exchange=self.dst_exchange, routing_key=routing_key, body=json.dumps(eof_message))
 
 
 class DynamicFilter(Worker):
@@ -97,11 +99,14 @@ class DynamicFilter(Worker):
     def callback(self, ch, method, properties, body):
         'Callback used to update the internal state, to change how future messages are filtered'
         msg = json.loads(body)
-        self.state = self.update_state(self.state, msg)
-        # If there is a new client, subscribe to the new queue
-        new_tmp_queue = f"{self.tmp_queues_prefix}_{msg['request_id']}_queue"
-        ch.queue_declare(queue=new_tmp_queue, durable=True)
-        ch.basic_consume(queue=new_tmp_queue, on_message_callback=self.filter_callback)
+        # Ignore EOFs through this queue. Each client will send their EOF through the tmp queue.
+        if msg.get('type') != 'EOF':
+            self.state = self.update_state(self.state, msg)
+            # If there is a new client, subscribe to the new queue
+            new_tmp_queue = f"{self.tmp_queues_prefix}_{msg['request_id']}_queue"
+            ch.queue_declare(queue=new_tmp_queue, durable=True)
+            ch.basic_consume(queue=new_tmp_queue, on_message_callback=self.filter_callback)
+        ch.basic_ack(delivery_tag=method.delivery_tag)
 
     def client_EOF(self, body):
         msg = json.loads(body)
@@ -114,8 +119,7 @@ class DynamicFilter(Worker):
         msg = json.loads(body)
         if msg.get('type') == 'EOF':
             ch.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_key, body=json.dumps(msg))
-            ch.basic_ack(delivery_tag=method.delivery_tag)
             self.client_EOF(body)
         elif self.filter_condition(self.state, msg):
             ch.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_key, body=json.dumps(msg))
-            ch.basic_ack(delivery_tag=method.delivery_tag)
+        ch.basic_ack(delivery_tag=method.delivery_tag)

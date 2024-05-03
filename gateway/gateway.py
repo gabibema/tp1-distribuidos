@@ -33,8 +33,9 @@ class Gateway:
 
     def __handle_client(self, client):
         protocol = TransferProtocol(client)
-        eof_count = 0
+        result_receiver = ResultReceiver('rabbitmq', self.result_queues, callback_result_client, protocol)
 
+        eof_count = 0
         while True:
             message, flag = protocol.receive_message()
                 
@@ -47,21 +48,20 @@ class Gateway:
                 break
 
         logging.warning('EOF received from both files')
-        result_receiver = ResultReceiver('rabbitmq', self.result_queues, callback_result_client, protocol)
         result_receiver.start()
 
 
     def __wait_workers(self):
         book_publisher = BookPublisher('rabbitmq', 'books_exchange', ExchangeType.topic)
         review_publisher = ReviewPublisher('rabbitmq')
-        book_publisher.publish('EOF', get_books_keys)
-        review_publisher.publish('EOF', 'reviews_queue')
+        result_receiver = ResultReceiver('rabbitmq', self.result_queues, callback_result, self.result_queues.copy())
+
+        book_publisher.publish('', get_books_keys)
+        review_publisher.publish('', 'reviews_queue')
         book_publisher.close()
         review_publisher.close()
-
-        result_receiver = ResultReceiver('rabbitmq', self.result_queues, callback_result, self.result_queues.copy())
+        
         result_receiver.start()
-
         result_receiver.close()
 
 
@@ -77,10 +77,10 @@ def callback_result_client(ch, method, properties, body, queue_name, callback_ar
 def callback_result(ch, method, properties, body, queue_name, callback_arg):
     body = json.loads(body)
     logging.warning(f'Received message of length {len(body)} from {queue_name}: {body}')
-    
-    if body['type'] == 'EOF':
+
+    if 'type' in body and body['type'] == 'EOF':
         callback_arg.remove(queue_name)
-    
+
     if not callback_arg:
         ch.stop_consuming()
 
