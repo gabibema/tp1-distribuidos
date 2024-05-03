@@ -33,8 +33,9 @@ class Gateway:
 
     def __handle_client(self, client):
         protocol = TransferProtocol(client)
-        eof_count = 0
+        result_receiver = ResultReceiver('rabbitmq', self.result_queues, callback_result_client, protocol)
 
+        eof_count = 0
         while True:
             message, flag = protocol.receive_message()
                 
@@ -47,7 +48,6 @@ class Gateway:
                 break
 
         logging.warning('EOF received from both files')
-        result_receiver = ResultReceiver('rabbitmq', self.result_queues, callback_result_client, protocol)
         result_receiver.start()
 
 
