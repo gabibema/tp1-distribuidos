@@ -81,7 +81,6 @@ def callback_result(ch, method, properties, body, queue_name, callback_arg):
     if 'type' in body and body['type'] == 'EOF':
         callback_arg.remove(queue_name)
 
-    callback_arg.remove(queue_name)
     if not callback_arg:
         ch.stop_consuming()
 
