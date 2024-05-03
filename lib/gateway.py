@@ -29,9 +29,20 @@ class BookPublisher():
         processed_row = False
         for row in reader:
             processed_row = True
-            row['request_id'] = uid
-            routing_key = routing_key_fn(row)
-            self.channel.basic_publish(exchange=self.exchange, routing_key=routing_key, body=json.dumps(row))
+            row_filtered = {}
+            row_filtered['request_id'] = uid
+            if 'Title' in row:
+                row_filtered['Title'] = row['Title']
+            if 'publishedDate' in row:
+                row_filtered['publishedDate'] = row['publishedDate']
+            if 'categories' in row:
+                row_filtered['categories'] = row['categories']
+            if 'authors' in row:
+                row_filtered['authors'] = row['authors']
+            
+            routing_key = routing_key_fn(row_filtered)
+            self.channel.basic_publish(exchange=self.exchange, routing_key=routing_key, body=json.dumps(row_filtered))
+
         if not processed_row:
             eof_msg = json.dumps({'request_id': uid, 'type': 'EOF'})
             logging.warning(f'{eof_msg}')
@@ -55,8 +66,18 @@ class ReviewPublisher():
     def publish(self, message, routing_key):
         csv_stream = StringIO(message)
         uid = csv_stream.readline().strip()
+
         reader = DictReader(csv_stream)
-        rows = [{'request_id': uid, **row} for row in reader]
+        rows = []
+        for row in reader:
+            current_row = {'request_id': uid}
+            if 'Title' in row:
+                current_row['Title'] = row['Title']
+            if 'review/text' in row:
+                current_row['review/text'] = row['review/text']
+            if len(current_row) > 1:
+                rows.append(current_row)
+    
         if not rows:
             eof_msg = json.dumps([{'request_id': uid, 'type': 'EOF'}])
             logging.warning(f'{eof_msg}')
