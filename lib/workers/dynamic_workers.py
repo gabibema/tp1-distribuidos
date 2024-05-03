@@ -119,8 +119,7 @@ class DynamicFilter(Worker):
         msg = json.loads(body)
         if msg.get('type') == 'EOF':
             ch.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_key, body=json.dumps(msg))
-            ch.basic_ack(delivery_tag=method.delivery_tag)
             self.client_EOF(body)
         elif self.filter_condition(self.state, msg):
             ch.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_key, body=json.dumps(msg))
-            ch.basic_ack(delivery_tag=method.delivery_tag)
+        ch.basic_ack(delivery_tag=method.delivery_tag)
