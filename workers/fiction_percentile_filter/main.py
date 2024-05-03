@@ -1,4 +1,3 @@
-import json
 import random
 from pika.exchange_type import ExchangeType
 from lib.workers import DynamicFilter
@@ -11,8 +10,7 @@ def update_state(old_state, message):
         old_state[message['request_id']] = message['percentile']
     return old_state
 
-def filter_condition(state, body):
-    msg = json.loads(body)
+def filter_condition(state, msg):
     # if Book's average review NLP is greater than the 10th percentile from state
     return msg['average'] >= state[msg['request_id']]
 
