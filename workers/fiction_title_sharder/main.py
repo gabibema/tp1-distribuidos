@@ -1,5 +1,6 @@
 import json
 from pika.exchange_type import ExchangeType
+from lib.broker import RabbitMQConnection
 from lib.workers import Router
 SHARD_COUNT = 1
 
@@ -21,7 +22,8 @@ def main():
     src_routing_key = 'fiction_filtered_queue'
     dst_exchange = 'fiction_books_sharded_exchange'
     dst_routing_key = 'fiction_books'
-    worker = Router(routing_fn, rabbit_hostname, src_queue, src_exchange, src_routing_key, dst_exchange=dst_exchange, dst_routing_key=dst_routing_key)
+    connection = RabbitMQConnection(rabbit_hostname)
+    worker = Router(routing_fn, connection=connection, src_queue=src_queue, src_exchange=src_exchange, src_routing_key=src_routing_key, dst_exchange=dst_exchange, dst_routing_key=dst_routing_key)
     worker.start()
 
 if __name__ == '__main__':

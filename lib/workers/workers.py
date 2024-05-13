@@ -8,34 +8,29 @@ import pika
 WAIT_TIME_PIKA=5
 
 class Worker(ABC):
-
-    def new(self, rabbit_hostname, src_queue='', src_exchange='', src_routing_key=[''], src_exchange_type=ExchangeType.direct, dst_exchange='', dst_routing_key='', dst_exchange_type=ExchangeType.direct):
-        wait_rabbitmq()
-        # init RabbitMQ channel
-        connection = pika.BlockingConnection(pika.ConnectionParameters(host=rabbit_hostname))
-        self.channel = connection.channel()
-        self.channel.basic_qos(prefetch_count=50, global_qos=True)
+    def new(self, connection, src_queue='', src_exchange='', src_routing_key=[''], src_exchange_type=ExchangeType.direct, dst_exchange='', dst_routing_key='', dst_exchange_type=ExchangeType.direct):
+        self.connection = connection
+        self.connection.channel.basic_qos(prefetch_count=50, global_qos=True)
+        
         # init source queue and bind to exchange
-        self.channel.queue_declare(queue=src_queue, durable=True)
-        self.channel.basic_consume(queue=src_queue, on_message_callback=self.callback)
+        self.connection.create_queue(src_queue, persistent=True)
+        self.connection.set_consumer(src_queue, self.callback)
+        
         if src_exchange:
-            self.channel.exchange_declare(src_exchange, exchange_type=src_exchange_type)
-            if type(src_routing_key) == str:
+            self.connection.create_router(src_exchange, src_exchange_type)
+            if isinstance(src_routing_key, str):
                 src_routing_key = [src_routing_key]
             for routing_key in src_routing_key:
-                self.channel.queue_bind(src_queue, src_exchange, routing_key=routing_key)
+                self.connection.link_queue(src_queue, src_exchange, routing_key)
+        
         if src_exchange_type == ExchangeType.topic:
-            self.channel.queue_bind(src_queue, src_exchange, routing_key='EOF')
+            self.connection.link_queue(src_queue, src_exchange, routing_key='EOF')
+        
         # init destination exchange
         self.dst_exchange = dst_exchange
         if dst_exchange:
-            self.channel.exchange_declare(exchange=dst_exchange, exchange_type=dst_exchange_type)
+            self.connection.create_router(dst_exchange, dst_exchange_type)
         self.routing_key = dst_routing_key
-
-    def connect_to_peers(self):
-        # set up control queues between workers that consume from the same queue
-        # this will be used for propagating client EOFs
-        raise NotImplementedError
 
     @abstractmethod
     def callback(self, ch, method, properties, body):
@@ -43,7 +38,7 @@ class Worker(ABC):
         pass
 
     def start(self):
-        self.channel.start_consuming()
+        self.connection.begin_consuming()
 
     def end(self):
         # nothing to clean up - MAY be overriden by subclasses.
@@ -51,40 +46,40 @@ class Worker(ABC):
 
 
 class Filter(Worker):
-    def __init__(self, filter_condition, *args, **kwargs):
+    def __init__(self, filter_condition, connection, *args, **kwargs):
         self.filter_condition = filter_condition
-        self.new(*args, **kwargs)
+        super().new(connection=connection, *args, **kwargs)
 
     def callback(self, ch, method, properties, body):
         'Callback given to a RabbitMQ queue to invoke for each message in the queue'
         if json.loads(body).get('type') == 'EOF':
             logging.warning(json.loads(body))
         if json.loads(body).get('type') == 'EOF' or self.filter_condition(body):
-            ch.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_key, body=body)
-        ch.basic_ack(delivery_tag=method.delivery_tag)
+            self.connection.send_message(self.dst_exchange, self.routing_key, body)
+        self.connection.acknowledge_message(method.delivery_tag)
 
 
 class Map(Worker):
-    def __init__(self, map_fn, *args, **kwargs):
+    def __init__(self, map_fn, connection, *args, **kwargs):
         self.map_fn = map_fn
-        self.new(*args, **kwargs)
+        super().new(connection=connection, *args, **kwargs)
 
     def callback(self, ch, method, properties, body):
         'Callback given to a RabbitMQ queue to invoke for each message in the queue'
         if json.loads(body).get('type') == 'EOF':
             logging.warning(json.loads(body))
-            ch.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_key, body=body)
+            self.connection.send_message(self.dst_exchange, self.routing_key, body)
         else:
-            ch.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_key, body=self.map_fn(body))
-        ch.basic_ack(delivery_tag=method.delivery_tag)
+            self.connection.send_message(self.dst_exchange, self.routing_key, self.map_fn(body))
+        self.connection.acknowledge_message(method.delivery_tag)
 
 
 class Aggregate(Worker):
-    def __init__(self, aggregate_fn, result_fn, accumulator, *args, **kwargs):
+    def __init__(self, aggregate_fn, result_fn, accumulator, connection, *args, **kwargs):
         self.aggregate_fn = aggregate_fn
         self.result_fn = result_fn
         self.accumulator = accumulator
-        self.new(*args, **kwargs)
+        super().new(connection=connection, *args, **kwargs)
 
     def callback(self, ch, method, properties, body):
         'Callback given to a RabbitMQ queue to invoke for each message in the queue'
@@ -97,19 +92,19 @@ class Aggregate(Worker):
                 self.end(msg)
             else:
                 self.aggregate_fn(msg, self.accumulator)
-        ch.basic_ack(delivery_tag=method.delivery_tag)
+        self.connection.acknowledge_message(method.delivery_tag)
 
     def end(self, eof_message):
         logging.warning(f'{self.dst_exchange=}, {self.routing_key=}')
         msg = self.result_fn(eof_message, self.accumulator)
-        self.channel.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_key, body=msg)
-        self.channel.basic_publish(exchange=self.dst_exchange, routing_key=self.routing_key, body=json.dumps(eof_message))
+        self.connection.send_message(self.dst_exchange, self.routing_key, msg)
+        self.connection.send_message(self.dst_exchange, self.routing_key, json.dumps(eof_message))
 
 
 class Router(Worker):
-    def __init__(self, routing_fn, *args, **kwargs):
+    def __init__(self, routing_fn, connection, *args, **kwargs):
         self.routing_fn = routing_fn
-        self.new(*args, **kwargs)
+        super().new(connection=connection, *args, **kwargs)
 
     def callback(self, ch, method, properties, body):
         'Callback given to a RabbitMQ queue to invoke for each message in the queue'
@@ -117,8 +112,8 @@ class Router(Worker):
             logging.warning(json.loads(body))
         routing_keys = self.routing_fn(body)
         for routing_key in routing_keys:
-            ch.basic_publish(exchange=self.dst_exchange, routing_key=routing_key, body=body)
-        ch.basic_ack(delivery_tag=method.delivery_tag)
+            self.connection.send_message(self.dst_exchange, routing_key, body)
+        self.connection.acknowledge_message(method.delivery_tag)
 
 
 def wait_rabbitmq(host='rabbitmq', timeout=120, interval=10):

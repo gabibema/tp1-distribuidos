@@ -1,5 +1,6 @@
 import json
 import logging
+from lib.broker import RabbitMQConnection
 from lib.workers import Aggregate
 
 def aggregate(msg, accumulator):
@@ -34,7 +35,8 @@ def main():
     src_exchange = 'authors_sharded_exchange'
     dst_routing_key = 'author_decades'
     logging.basicConfig(level=logging.WARNING, format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
-    worker = Aggregate(aggregate, result, accumulator, rabbit_hostname, src_queue, src_exchange, src_routing_key, dst_routing_key=dst_routing_key)
+    connection = RabbitMQConnection(rabbit_hostname)
+    worker = Aggregate(aggregate, result, accumulator, connection=connection, src_queue=src_queue, src_exchange=src_exchange, src_routing_key=src_routing_key, dst_routing_key=dst_routing_key)
     worker.start()
 
 if __name__ == '__main__':

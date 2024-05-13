@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from time import sleep, time
 import pika
 
 class BrokerConnection(ABC):
@@ -34,8 +35,13 @@ class BrokerConnection(ABC):
     def acknowledge_message(self, message_id):
         pass
 
+    @abstractmethod
+    def wait_connection(self):
+        pass
+
 class RabbitMQConnection(BrokerConnection):
     def __init__(self, hostname):
+        self.wait_connection()
         self.connection = pika.BlockingConnection(pika.ConnectionParameters(host=hostname))
         self.channel = self.connection.channel()
 
@@ -59,3 +65,19 @@ class RabbitMQConnection(BrokerConnection):
 
     def acknowledge_message(self, message_id):
         self.channel.basic_ack(delivery_tag=message_id)
+    
+    def wait_connection(self, host='rabbitmq', timeout=120, interval=10):
+        """
+        Waits for RabbitMQ to be available.
+        """
+        start_time = time()
+        
+        while time() - start_time < timeout:
+            try:
+                connection = pika.BlockingConnection(pika.ConnectionParameters(host=host))
+                connection.close()
+                return
+            except pika.exceptions.AMQPConnectionError:
+                sleep(interval)
+
+        raise TimeoutError("RabbitMQ did not become available within the timeout period.")

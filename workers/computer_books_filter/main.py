@@ -1,5 +1,6 @@
 import json
 from pika.exchange_type import ExchangeType
+from lib.broker import RabbitMQConnection
 from lib.workers import Filter
 
 def title_filter(body):
@@ -17,7 +18,8 @@ def main():
     src_exchange = 'books_exchange'
     src_routing_key = ['2000','2010','2020']
     dst_routing_key = 'computer_books'
-    worker = Filter(title_filter, rabbit_hostname, src_queue, src_exchange, src_routing_key, ExchangeType.topic, dst_routing_key=dst_routing_key)
+    connection = RabbitMQConnection(rabbit_hostname)
+    worker = Filter(title_filter, connection=connection, src_queue=src_queue, src_exchange=src_exchange, src_routing_key=src_routing_key, src_exchange_type=ExchangeType.topic, dst_routing_key=dst_routing_key)
     worker.start()
 
 if __name__ == '__main__':
