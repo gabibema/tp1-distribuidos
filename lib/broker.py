@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from time import sleep, time
+import json
 import pika
+from uuid import uuid4
 
 class BrokerConnection(ABC):
     @abstractmethod
@@ -47,6 +49,25 @@ class RabbitMQConnection(BrokerConnection):
 
     def create_queue(self, queue_name, persistent):
         self.channel.queue_declare(queue=queue_name, durable=persistent)
+
+    def create_control_queue(self, queue_prefix, callback):
+        try:
+            # Acquire leader lock.
+            self.channel.queue_declare(queue=queue_prefix + '_lock', exclusive=True)
+            # This process is the leader.
+            queue_name = queue_prefix + '_leader'
+            self.channel.queue_declare(queue=queue_name, durable=True)
+            self.next_peer_queue = queue_name
+            self.channel.basic_consume(queue=queue_name, on_message_callback=callback)
+        except pika.exceptions.ChannelError:
+            # RESOURCE_LOCKED - someone else is already the leader.
+            queue_name = f'{queue_prefix}_{uuid4()}'
+            self.channel.queue_declare(queue=queue_name, durable=True)
+            self.next_peer_queue = None # Placeholder until the leader tells us who our next peer is.
+            self.channel.basic_consume(queue=queue_name, on_message_callback=callback)
+            # Announce itself to the leader.
+            message = {'type': 'NEW_PEER', 'queue_name': queue_name}
+            self.send_message('', queue_prefix + '_leader', json.dumps(message))
 
     def create_router(self, router_name, router_type):
         self.channel.exchange_declare(exchange=router_name, exchange_type=router_type)
