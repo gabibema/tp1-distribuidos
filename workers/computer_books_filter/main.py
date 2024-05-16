@@ -19,7 +19,8 @@ def main():
     src_routing_key = ['2000','2010','2020']
     dst_routing_key = 'computer_books'
     connection = RabbitMQConnection(rabbit_hostname)
-    worker = Filter(title_filter, connection=connection, src_queue=src_queue, src_exchange=src_exchange, src_routing_key=src_routing_key, src_exchange_type=ExchangeType.topic, dst_routing_key=dst_routing_key)
+    control_queue_prefix = 'ctrl_computer_books_filter'
+    worker = Filter(title_filter, control_queue_prefix, connection=connection, src_queue=src_queue, src_exchange=src_exchange, src_routing_key=src_routing_key, src_exchange_type=ExchangeType.topic, dst_routing_key=dst_routing_key)
     worker.start()
 
 if __name__ == '__main__':

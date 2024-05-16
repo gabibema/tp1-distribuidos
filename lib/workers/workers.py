@@ -9,10 +9,9 @@ from uuid import uuid4
 WAIT_TIME_PIKA=5
 
 class Worker(ABC):
-    def new(self, connection, control_queue_prefix, src_queue='', src_exchange='', src_routing_key=[''], src_exchange_type=ExchangeType.direct, dst_exchange='', dst_routing_key='', dst_exchange_type=ExchangeType.direct):
+    def new(self, connection, src_queue='', src_exchange='', src_routing_key=[''], src_exchange_type=ExchangeType.direct, dst_exchange='', dst_routing_key='', dst_exchange_type=ExchangeType.direct):
         self.id = str(uuid4())
         self.connection = connection
-        self.connection.create_control_queue(control_queue_prefix, self.control_callback)
         self.connection.channel.basic_qos(prefetch_count=50, global_qos=True)
 
         # init source queue and bind to exchange
@@ -45,56 +44,75 @@ class Worker(ABC):
         message = json.loads(body)
         if message.get('type') == 'NEW_PEER':
             # Insert peer in linked list, between self and the next peer.
-            old_next_peer = self.next_peer
-            self.next_peer = message['peer_name']
+            old_next_peer = self.connection.next_peer
+            self.connection.next_peer = message['peer_name']
             # Tell the new peer who their next peer is.
             message = {'type': 'SET_NEXT_PEER', 'peer_name': old_next_peer}
-            self.connection.send_message('', self.next_peer, json.dumps(message))
+            self.connection.send_message('', self.connection.next_peer, json.dumps(message))
         elif message.get('type') == 'SET_NEXT_PEER':
-            self.next_peer = message['peer_name']
-            self.start()
+            self.connection.next_peer = message['peer_name']
         elif message.get('type') == 'EOF':
             if message['intended_recipient'] == self.id:
-                self.end(message)
+                self.end(ch, method, properties, body)
             else:
-                self.connection.send_message('', self.next_peer, body)
+                self.connection.send_message('', self.connection.next_peer, body)
         self.connection.acknowledge_message(method.delivery_tag)
 
     def start(self):
+        # Pending: Wait until self.connection.next_peer != None.
         self.connection.begin_consuming()
 
-    def end(self, eof_message):
-        # nothing to clean up - MAY be overriden by subclasses.
+    def end(self, ch, method, properties, body):
+        # nothing to do - MAY be overriden by subclasses.
         pass
 
 
 class Filter(Worker):
-    def __init__(self, filter_condition, connection, *args, **kwargs):
+    def __init__(self, filter_condition, control_queue_prefix, connection, *args, **kwargs):
         self.filter_condition = filter_condition
         super().new(connection=connection, *args, **kwargs)
+        self.connection.create_control_queue(control_queue_prefix, self.control_callback)
 
     def callback(self, ch, method, properties, body):
         'Callback given to a queue to invoke for each message in the queue'
-        if json.loads(body).get('type') == 'EOF':
-            logging.warning(json.loads(body))
-        if json.loads(body).get('type') == 'EOF' or self.filter_condition(body):
+        message = json.loads(body)
+        if message.get('type') == 'EOF':
+            logging.warning(message)
+            message['intended_recipient'] = self.id
+            self.connection.send_message('', self.connection.next_peer, json.dumps(message))
+        elif self.filter_condition(body):
             self.connection.send_message(self.dst_exchange, self.routing_key, body)
         self.connection.acknowledge_message(method.delivery_tag)
+
+    def end(self, ch, method, properties, body):
+        'Send EOF to next layer'
+        eof_message = json.loads(body)
+        del eof_message['intended_recipient']
+        self.connection.send_message(self.dst_exchange, self.routing_key, json.dumps(eof_message))
 
 
 class Map(Worker):
-    def __init__(self, map_fn, connection, *args, **kwargs):
+    def __init__(self, map_fn, control_queue_prefix, connection, *args, **kwargs):
         self.map_fn = map_fn
         super().new(connection=connection, *args, **kwargs)
+        self.connection.create_control_queue(control_queue_prefix, self.control_callback)
 
     def callback(self, ch, method, properties, body):
         'Callback given to a queue to invoke for each message in the queue'
-        if json.loads(body).get('type') == 'EOF':
-            logging.warning(json.loads(body))
-            self.connection.send_message(self.dst_exchange, self.routing_key, body)
+        message = json.loads(body)
+        if message.get('type') == 'EOF':
+            logging.warning(message)
+            message['intended_recipient'] = self.id
+            self.connection.send_message('', self.connection.next_peer, json.dumps(message))
         else:
             self.connection.send_message(self.dst_exchange, self.routing_key, self.map_fn(body))
         self.connection.acknowledge_message(method.delivery_tag)
+
+    def end(self, ch, method, properties, body):
+        'Send EOF to next layer'
+        eof_message = json.loads(body)
+        del eof_message['intended_recipient']
+        self.connection.send_message(self.dst_exchange, self.routing_key, json.dumps(eof_message))
 
 
 class Aggregate(Worker):
@@ -112,12 +130,13 @@ class Aggregate(Worker):
         for msg in messages:
             if msg.get('type') == 'EOF':
                 logging.warning(json.loads(body))
-                self.end(msg)
+                self.end(ch, method, properties, json.dumps(msg))
             else:
                 self.aggregate_fn(msg, self.accumulator)
         self.connection.acknowledge_message(method.delivery_tag)
 
-    def end(self, eof_message):
+    def end(self, ch, method, properties, body):
+        eof_message = json.loads(body)
         logging.warning(f'{self.dst_exchange=}, {self.routing_key=}')
         msg = self.result_fn(eof_message, self.accumulator)
         self.connection.send_message(self.dst_exchange, self.routing_key, msg)

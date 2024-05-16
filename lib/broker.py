@@ -44,6 +44,7 @@ class RabbitMQConnection(BrokerConnection):
     def __init__(self, hostname):
         self.wait_connection()
         self.connection = pika.BlockingConnection(pika.ConnectionParameters(host=hostname))
+        self.next_peer = None # Placeholder until the leader tells us who our next peer is.
         self.channel = self.connection.channel()
 
     def create_queue(self, queue_name, persistent):
@@ -62,7 +63,6 @@ class RabbitMQConnection(BrokerConnection):
             # RESOURCE_LOCKED - someone else is already the leader.
             queue_name = queue_prefix + '_' + self.id
             self.channel.queue_declare(queue=queue_name, durable=True)
-            self.next_peer = None # Placeholder until the leader tells us who our next peer is.
             self.channel.basic_consume(queue=queue_name, on_message_callback=callback)
             # Announce itself to the leader.
             message = {'type': 'NEW_PEER', 'peer_name': queue_name}
