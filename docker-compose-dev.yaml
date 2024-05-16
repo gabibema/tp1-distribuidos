@@ -141,6 +141,26 @@ services:
     links:
       - rabbitmq
 
+  title_sharder-2:
+    container_name: title_sharder-2
+    image: title_sharder:latest
+    entrypoint: python3 /app/main.py
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    links:
+      - rabbitmq
+
+  title_sharder-3:
+    container_name: title_sharder-3
+    image: title_sharder:latest
+    entrypoint: python3 /app/main.py
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    links:
+      - rabbitmq
+
   90s_title_sharder-1:
     container_name: 90s_title_sharder-1
     image: 90s_title_sharder:latest

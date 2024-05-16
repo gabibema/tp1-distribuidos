@@ -1,5 +1,6 @@
 import logging
 from pika.exchange_type import ExchangeType
+from lib.broker import RabbitMQConnection
 from lib.workers import DynamicFilter
 
 def update_state(old_state, message):
@@ -25,7 +26,8 @@ def main():
     dst_routing_key = f'fiction_rev_shard{shard_id}_queue'
     tmp_queues_prefix = f'fiction_reviews_shard{shard_id}'
     logging.basicConfig(level=logging.WARNING, format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
-    worker = DynamicFilter(update_state, filter_condition, tmp_queues_prefix, rabbit_hostname, src_queue, src_exchange, src_routing_key, dst_routing_key=dst_routing_key)
+    connection = RabbitMQConnection(rabbit_hostname)
+    worker = DynamicFilter(update_state, filter_condition, tmp_queues_prefix, connection=connection, src_queue=src_queue, src_exchange=src_exchange, src_routing_key=src_routing_key, dst_routing_key=dst_routing_key)
     worker.start()
 
 if __name__ == '__main__':

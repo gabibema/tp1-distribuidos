@@ -1,6 +1,7 @@
 import logging
 from collections import namedtuple
 from pika.exchange_type import ExchangeType
+from lib.broker import RabbitMQConnection
 from lib.workers import DynamicAggregate
 
 AvgAccumulator = namedtuple('AvgAccumulator', ['sum', 'count'])
@@ -26,7 +27,8 @@ def main():
     tmp_queues = [('avg_nlp','avg_nlp')]
     accumulator = {}
     logging.basicConfig(level=logging.WARNING, format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
-    worker = DynamicAggregate(aggregate, result, accumulator, tmp_queues, rabbit_hostname, src_queue, src_exchange, src_routing_key, dst_exchange=dst_exchange, dst_routing_key='avg_nlp', dst_exchange_type=ExchangeType.topic)
+    connection = RabbitMQConnection(rabbit_hostname)
+    worker = DynamicAggregate(aggregate, result, accumulator, tmp_queues=tmp_queues, connection=connection, src_queue=src_queue, src_exchange=src_exchange, src_routing_key=src_routing_key, dst_exchange=dst_exchange, dst_routing_key='avg_nlp', dst_exchange_type=ExchangeType.topic)
     worker.start()
 
 if __name__ == '__main__':

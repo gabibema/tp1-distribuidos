@@ -1,5 +1,6 @@
 import json
 from heapq import nlargest
+from lib.broker import RabbitMQConnection
 from lib.workers import Aggregate
 
 def aggregate(msg, accumulator):
@@ -20,7 +21,8 @@ def main():
     src_exchange='popular_90s_exchange'
     dst_routing_key = 'top_90s_books'
     accumulator = {}
-    worker = Aggregate(aggregate, result, accumulator, rabbit_hostname, src_queue, src_exchange, src_routing_key, dst_routing_key=dst_routing_key)
+    connection = RabbitMQConnection(rabbit_hostname)
+    worker = Aggregate(aggregate, result, accumulator, connection=connection, src_queue=src_queue, src_exchange=src_exchange, src_routing_key=src_routing_key, dst_routing_key=dst_routing_key)
     worker.start()
 
 if __name__ == '__main__':
