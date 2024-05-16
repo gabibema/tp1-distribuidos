@@ -102,7 +102,13 @@ class Client:
     def __save_in_file(self, filename, body: dict):
         filepath = os.path.join(self.output_dir, f'{filename}.csv')
         file_exists = os.path.isfile(filepath)
-        
+
+        if 'authors' in body:
+            body_list = [{'author': author} for author in body['authors']]
+            body = body_list
+        elif 'top10' in body:
+            body = body['top10']
+
         if isinstance(body, dict):
             if 'request_id' in body:
                 body.pop('request_id')
