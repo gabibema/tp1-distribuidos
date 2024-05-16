@@ -24,7 +24,8 @@ def main():
     dst_exchange = '90s_books_sharded_exchange'
     dst_routing_key = '90s_books'
     connection = RabbitMQConnection(rabbit_hostname)
-    worker = Router(routing_fn, connection=connection, src_queue=src_queue, src_exchange=src_exchange, src_routing_key=src_routing_key, src_exchange_type=ExchangeType.topic, dst_exchange=dst_exchange, dst_routing_key=dst_routing_key)
+    control_queue_prefix = 'ctrl_90s_title_sharder'
+    worker = Router(routing_fn, control_queue_prefix, connection=connection, src_queue=src_queue, src_exchange=src_exchange, src_routing_key=src_routing_key, src_exchange_type=ExchangeType.topic, dst_exchange=dst_exchange, dst_routing_key=dst_routing_key)
     worker.start()
 
 if __name__ == '__main__':

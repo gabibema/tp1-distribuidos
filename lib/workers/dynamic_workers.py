@@ -64,7 +64,7 @@ class DynamicRouter(DynamicWorker):
         if msg['request_id'] not in self.ongoing_requests:
             self.create_queues(msg['request_id'])
         if msg.get('type') == 'EOF':
-            self.control_callback(ch, method, properties, body)
+            self.control_callback(ch, method, properties, json.dumps(msg))
         else:
             self.inner_callback(ch, method, properties, message)
 
