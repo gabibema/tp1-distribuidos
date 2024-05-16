@@ -1,6 +1,6 @@
 import random
 from pika.exchange_type import ExchangeType
-from lib.broker import RabbitMQConnection
+from lib.broker import WorkerBroker
 from lib.workers import DynamicFilter
 
 def update_state(old_state, message):
@@ -23,7 +23,7 @@ def main():
     src_routing_key = src_queue
     dst_routing_key = 'top_fiction_books'
     tmp_queues_prefix = 'avg_nlp'
-    connection = RabbitMQConnection(rabbit_hostname)
+    connection = WorkerBroker(rabbit_hostname)
     worker = DynamicFilter(update_state, filter_condition, tmp_queues_prefix, connection=connection, src_queue=src_queue, src_exchange=src_exchange, src_routing_key=src_routing_key, dst_routing_key=dst_routing_key)
     worker.start()
 

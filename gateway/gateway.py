@@ -3,7 +3,7 @@ import logging
 from threading import Thread
 from socket import SOCK_STREAM, socket, AF_INET
 from pika.exchange_type import ExchangeType
-from lib.broker import RabbitMQConnection
+from lib.broker import WorkerBroker
 from lib.gateway import BookPublisher, ResultReceiver, ReviewPublisher, MAX_KEY_LENGTH
 from lib.transfer.transfer_protocol import MESSAGE_FLAG, TransferProtocol
 from lib.workers.workers import wait_rabbitmq
@@ -30,7 +30,7 @@ class Gateway:
 
     def __handle_client(self, client):
         protocol = TransferProtocol(client)
-        connection = RabbitMQConnection("rabbitmq")
+        connection = WorkerBroker("rabbitmq")
         result_receiver = ResultReceiver(connection, self.result_queues, callback_result_client, protocol)
         book_publisher = BookPublisher(connection, 'books_exchange', ExchangeType.topic)
         review_publisher = ReviewPublisher(connection)
@@ -52,7 +52,7 @@ class Gateway:
 
 
     def __wait_workers(self):
-        connection = RabbitMQConnection("rabbitmq")
+        connection = WorkerBroker("rabbitmq")
         book_publisher = BookPublisher(connection, 'books_exchange', ExchangeType.topic)
         review_publisher = ReviewPublisher(connection)
         result_receiver = ResultReceiver(connection, self.result_queues, callback_result, self.result_queues.copy())
