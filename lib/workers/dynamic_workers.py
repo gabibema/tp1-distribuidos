@@ -66,13 +66,13 @@ class DynamicRouter(DynamicWorker):
             self.connection.send_message('', self.connection.next_peer, json.dumps(msg))
         else:
             self.inner_callback(ch, method, properties, message)
+        ch.basic_ack(delivery_tag=method.delivery_tag)
 
     def inner_callback(self, ch, method, properties, messages):
         'Callback given to a RabbitMQ queue to invoke for each message in the queue'
         for msg in messages:
             for routing_key in self.routing_fn(msg):
                 ch.basic_publish(exchange=self.dst_exchange, routing_key=routing_key, body=json.dumps(msg))
-        ch.basic_ack(delivery_tag=method.delivery_tag)
 
     def end(self, ch, method, properties, body):
         'Send EOF to next layer'
