@@ -1,7 +1,7 @@
 import json
 import random
 from pika.exchange_type import ExchangeType
-from lib.broker import RabbitMQConnection
+from lib.broker import WorkerBroker
 from lib.workers import Aggregate
 
 def aggregate(msg, accumulator):
@@ -67,7 +67,7 @@ def main():
     dst_exchange = 'nlp_percentile_exchange'
     dst_routing_key = 'nlp_percentile_queue'
     accumulator = {}
-    connection = RabbitMQConnection(rabbit_hostname)
+    connection = WorkerBroker(rabbit_hostname)
     worker = Aggregate(aggregate, result, accumulator, connection=connection, src_queue=src_queue, src_exchange=src_exchange, src_routing_key=src_routing_key, src_exchange_type=ExchangeType.topic, dst_exchange=dst_exchange, dst_routing_key=dst_routing_key)
     worker.start()
 

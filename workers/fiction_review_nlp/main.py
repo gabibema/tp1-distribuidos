@@ -1,5 +1,5 @@
 import json
-from lib.broker import RabbitMQConnection
+from lib.broker import WorkerBroker
 from lib.workers import Map
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
     
@@ -15,7 +15,7 @@ def main():
     src_queue = f'fiction_rev_shard{shard_id}_queue'
     dst_exchange = 'nlp_revs_exchange'
     dst_routing_key = f'nlp_revs_shard{shard_id}'
-    connection = RabbitMQConnection(rabbit_hostname)
+    connection = WorkerBroker(rabbit_hostname)
     control_queue_prefix = 'ctrl_fiction_review_nlp'
     worker = Map(sentiment, control_queue_prefix, connection=connection, src_queue=src_queue, dst_exchange=dst_exchange, dst_routing_key=dst_routing_key)
     worker.start()
