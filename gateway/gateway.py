@@ -3,6 +3,7 @@ import logging
 from threading import Thread
 from socket import SOCK_STREAM, socket, AF_INET
 from pika.exchange_type import ExchangeType
+from lib.broker import RabbitMQConnection
 from lib.gateway import BookPublisher, ResultReceiver, ReviewPublisher, MAX_KEY_LENGTH
 from lib.transfer.transfer_protocol import MESSAGE_FLAG, TransferProtocol
 from lib.workers.workers import wait_rabbitmq
@@ -29,9 +30,10 @@ class Gateway:
 
     def __handle_client(self, client):
         protocol = TransferProtocol(client)
-        result_receiver = ResultReceiver('rabbitmq', self.result_queues, callback_result_client, protocol)
-        book_publisher = BookPublisher('rabbitmq', 'books_exchange', ExchangeType.topic)
-        review_publisher = ReviewPublisher('rabbitmq')
+        connection = RabbitMQConnection("rabbitmq")
+        result_receiver = ResultReceiver(connection, self.result_queues, callback_result_client, protocol)
+        book_publisher = BookPublisher(connection, 'books_exchange', ExchangeType.topic)
+        review_publisher = ReviewPublisher(connection)
 
         eof_count = 0
         while True:
@@ -50,9 +52,10 @@ class Gateway:
 
 
     def __wait_workers(self):
-        book_publisher = BookPublisher('rabbitmq', 'books_exchange', ExchangeType.topic)
-        review_publisher = ReviewPublisher('rabbitmq')
-        result_receiver = ResultReceiver('rabbitmq', self.result_queues, callback_result, self.result_queues.copy())
+        connection = RabbitMQConnection("rabbitmq")
+        book_publisher = BookPublisher(connection, 'books_exchange', ExchangeType.topic)
+        review_publisher = ReviewPublisher(connection)
+        result_receiver = ResultReceiver(connection, self.result_queues, callback_result, self.result_queues.copy())
 
         book_publisher.publish('', get_books_keys)
         review_publisher.publish('', 'reviews_queue')
