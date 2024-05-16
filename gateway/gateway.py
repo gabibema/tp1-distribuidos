@@ -86,6 +86,9 @@ def callback_result(ch, method, properties, body, queue_name, callback_arg):
 
 
 def get_books_keys(row):
+    if 'type' in row and row['type'] == 'EOF':
+        return 'EOF'
+
     date_str = row['publishedDate']
     try:
         year = int(date_str.split('-', maxsplit=1)[0])

@@ -65,7 +65,7 @@ class Client:
             if batch:
                 queue.put((flag, '\n'.join(batch)))
 
-            queue.put((flag, self.uid))
+            queue.put((flag, '\n'.join([self.uid, 'type', 'EOF'])))
 
     def __sending_completed(self, books_queue: Queue, reviews_queue: Queue):
         return books_queue.empty() and reviews_queue.empty() and not self.books_sender.is_alive() and not self.reviews_sender.is_alive()

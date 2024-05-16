@@ -26,11 +26,13 @@ class BookPublisher():
         uid = csv_stream.readline().strip()
         reader = DictReader(csv_stream)
 
-        processed_row = False
+        eof_received = NOT_EOF_VALUE
         for row in reader:
-            processed_row = True
             row_filtered = {}
             row_filtered['request_id'] = uid
+            if 'type' in row:
+                eof_received = EOF_VALUE if 'EOF' in row['type'] else NOT_EOF_VALUE
+                row_filtered['type'] = row['type']
             if 'Title' in row:
                 row_filtered['Title'] = row['Title']
             if 'publishedDate' in row:
@@ -43,14 +45,12 @@ class BookPublisher():
             routing_key = routing_key_fn(row_filtered)
             self.channel.basic_publish(exchange=self.exchange, routing_key=routing_key, body=json.dumps(row_filtered))
 
-        if not processed_row:
-            eof_msg = json.dumps({'request_id': uid, 'type': 'EOF'})
-            logging.warning(f'{eof_msg}')
-            self.channel.basic_publish(exchange=self.exchange, routing_key='EOF', body=json.dumps({'request_id': uid, 'type': 'EOF'}))
+        if eof_received == EOF_VALUE:
+            logging.warning(f'{uid} EOF received')
         else: 
             logging.warning(f'Received message of length {len(message)}')
         
-        return EOF_VALUE if not processed_row else NOT_EOF_VALUE
+        return eof_received
     
     def close(self):
         self.channel.close()
@@ -67,6 +67,7 @@ class ReviewPublisher():
         csv_stream = StringIO(message)
         uid = csv_stream.readline().strip()
 
+        eof_received = NOT_EOF_VALUE
         reader = DictReader(csv_stream)
         rows = []
         for row in reader:
@@ -75,19 +76,21 @@ class ReviewPublisher():
                 current_row['Title'] = row['Title']
             if 'review/text' in row:
                 current_row['review/text'] = row['review/text']
+            if 'type' in row:
+                current_row['type'] = row['type']
             if len(current_row) > 1:
                 rows.append(current_row)
     
-        if not rows:
-            eof_msg = json.dumps([{'request_id': uid, 'type': 'EOF'}])
-            logging.warning(f'{eof_msg}')
-            self.channel.basic_publish(exchange='', routing_key=routing_key, body=eof_msg)
+        if len(rows) == 1 and 'type' in rows[0] and 'EOF' in rows[0]['type']:
+            eof_received = EOF_VALUE
+            logging.warning(f'{uid} EOF received')
+            
         else:
-            full_message = json.dumps(rows)
-            self.channel.basic_publish(exchange='', routing_key=routing_key, body=full_message)
             logging.warning(f'Received message of length {len(message)}')
         
-        return EOF_VALUE if not rows else NOT_EOF_VALUE
+        full_message = json.dumps(rows)
+        self.channel.basic_publish(exchange='', routing_key=routing_key, body=full_message)
+        return eof_received
     
     def close(self):
         self.channel.close()
