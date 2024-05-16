@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from time import sleep, time
+from uuid import uuid4
 import json
 import pika
 
@@ -51,6 +52,7 @@ class RabbitMQConnection(BrokerConnection):
         self.channel.queue_declare(queue=queue_name, durable=persistent)
 
     def create_control_queue(self, queue_prefix, callback):
+        self.id = str(uuid4())
         try:
             # Acquire leader lock.
             self.channel.queue_declare(queue=queue_prefix + '_lock', exclusive=True)
@@ -59,9 +61,11 @@ class RabbitMQConnection(BrokerConnection):
             self.channel.queue_declare(queue=queue_name, durable=True)
             self.next_peer = queue_name
             self.channel.basic_consume(queue=queue_name, on_message_callback=callback)
-        except pika.exceptions.ChannelError:
+        except pika.exceptions.ChannelClosedByBroker:
             # RESOURCE_LOCKED - someone else is already the leader.
             queue_name = queue_prefix + '_' + self.id
+            # open a new channel.
+            self.channel = self.connection.channel()
             self.channel.queue_declare(queue=queue_name, durable=True)
             self.channel.basic_consume(queue=queue_name, on_message_callback=callback)
             # Announce itself to the leader.

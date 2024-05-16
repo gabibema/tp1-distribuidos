@@ -2,7 +2,6 @@ import json
 import logging
 from abc import abstractmethod
 from .workers import Worker, ParallelWorker
-from uuid import uuid4
 
 class DynamicWorker(Worker):
     """
@@ -49,7 +48,6 @@ class DynamicRouter(DynamicWorker):
     control_callback = ParallelWorker.control_callback
 
     def __init__(self, routing_fn, control_queue_prefix, *args, **kwargs):
-        self.id = str(uuid4())
         self.routing_fn = routing_fn
         super().new(*args, **kwargs)
         self.connection.create_control_queue(control_queue_prefix, self.control_callback)
@@ -64,7 +62,8 @@ class DynamicRouter(DynamicWorker):
         if msg['request_id'] not in self.ongoing_requests:
             self.create_queues(msg['request_id'])
         if msg.get('type') == 'EOF':
-            self.control_callback(ch, method, properties, json.dumps(msg))
+            msg['intended_recipient'] = self.connection.id
+            self.connection.send_message('', self.connection.next_peer, json.dumps(msg))
         else:
             self.inner_callback(ch, method, properties, message)
 
@@ -79,8 +78,9 @@ class DynamicRouter(DynamicWorker):
         'Send EOF to next layer'
         eof_message = json.loads(body)
         del eof_message['intended_recipient']
-        self.inner_callback(self, ch, method, properties, [eof_message])
-        self.ongoing_requests.discard(msg['request_id'])
+        for routing_key in self.routing_fn(eof_message):
+            ch.basic_publish(exchange=self.dst_exchange, routing_key=routing_key, body=json.dumps(eof_message))
+        self.ongoing_requests.discard(eof_message['request_id'])
         # DON'T delete queues yet! messages need to be consumed.
         # queues should be deleted by consumer after reading the EOF.
 

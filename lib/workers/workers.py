@@ -4,7 +4,6 @@ import json
 import logging
 from pika.exchange_type import ExchangeType
 import pika
-from uuid import uuid4
 
 WAIT_TIME_PIKA=5
 
@@ -50,7 +49,6 @@ class Worker(ABC):
 class ParallelWorker(Worker):
     def new(self, control_queue_prefix, *args, **kwargs):
         super().new(*args, **kwargs)
-        self.id = str(uuid4())
         self.connection.create_control_queue(control_queue_prefix, self.control_callback)
 
     def control_callback(self, ch, method, properties, body):
@@ -68,7 +66,7 @@ class ParallelWorker(Worker):
             # Worker is ready to process incoming messages, subscribe it to work queue.
             self.connection.set_consumer(self.src_queue, self.callback)
         elif message.get('type') == 'EOF':
-            if message['intended_recipient'] == self.id:
+            if message['intended_recipient'] == self.connection.id:
                 self.end(ch, method, properties, body)
             else:
                 self.connection.send_message('', self.connection.next_peer, body)
@@ -91,7 +89,7 @@ class Filter(ParallelWorker):
         message = json.loads(body)
         if message.get('type') == 'EOF':
             logging.warning(message)
-            message['intended_recipient'] = self.id
+            message['intended_recipient'] = self.connection.id
             self.connection.send_message('', self.connection.next_peer, json.dumps(message))
         elif self.filter_condition(body):
             self.connection.send_message(self.dst_exchange, self.routing_key, body)
@@ -108,7 +106,7 @@ class Map(ParallelWorker):
         message = json.loads(body)
         if message.get('type') == 'EOF':
             logging.warning(message)
-            message['intended_recipient'] = self.id
+            message['intended_recipient'] = self.connection.id
             self.connection.send_message('', self.connection.next_peer, json.dumps(message))
         else:
             self.connection.send_message(self.dst_exchange, self.routing_key, self.map_fn(body))
@@ -124,7 +122,7 @@ class Router(ParallelWorker):
         message = json.loads(body)
         if message.get('type') == 'EOF':
             logging.warning(message)
-            message['intended_recipient'] = self.id
+            message['intended_recipient'] = self.connection.id
             self.connection.send_message('', self.connection.next_peer, json.dumps(message))
         else:
             routing_keys = self.routing_fn(body)
