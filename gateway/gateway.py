@@ -21,10 +21,6 @@ class Gateway:
         wait_rabbitmq()
         #self.__wait_workers()
 
-
-        self.book_publisher = BookPublisher('rabbitmq', 'books_exchange', ExchangeType.topic)
-        self.review_publisher = ReviewPublisher('rabbitmq')
-
         while True:
             self.conn.listen(CLIENTS_BACKLOG)
             client, addr = self.conn.accept()
@@ -34,15 +30,17 @@ class Gateway:
     def __handle_client(self, client):
         protocol = TransferProtocol(client)
         result_receiver = ResultReceiver('rabbitmq', self.result_queues, callback_result_client, protocol)
+        book_publisher = BookPublisher('rabbitmq', 'books_exchange', ExchangeType.topic)
+        review_publisher = ReviewPublisher('rabbitmq')
 
         eof_count = 0
         while True:
             message, flag = protocol.receive_message()
                 
             if flag == MESSAGE_FLAG['BOOK']:
-                eof_count += self.book_publisher.publish(message, get_books_keys)
+                eof_count += book_publisher.publish(message, get_books_keys)
             elif flag == MESSAGE_FLAG['REVIEW']:
-                eof_count += self.review_publisher.publish(message, 'reviews_queue')
+                eof_count += review_publisher.publish(message, 'reviews_queue')
             
             if eof_count == 2:
                 break
