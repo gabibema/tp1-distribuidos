@@ -66,13 +66,15 @@ class Gateway:
         result_receiver.close()
 
 
-def callback_result_client(ch, method, properties, body, queue_name, callback_arg: TransferProtocol):
+def callback_result_client(self, ch, method, properties, body, queue_name, callback_arg: TransferProtocol):
     body = json.loads(body)
 
     if 'type' in body:
         callback_arg.send_message(json.dumps({'file': queue_name}), MESSAGE_FLAG['EOF'])
     else:
         callback_arg.send_message(json.dumps({'file':queue_name, 'body':body}), MESSAGE_FLAG['RESULT'])
+    
+    self.connection.acknowledge_message(method.delivery_tag)
     
 
 def callback_result(ch, method, properties, body, queue_name, callback_arg):

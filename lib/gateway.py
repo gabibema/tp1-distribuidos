@@ -92,7 +92,7 @@ class ResultReceiver():
             self.connection.create_queue(queue_name, True)
             self.connection.set_consumer(
                 queue_name,
-                lambda ch, method, properties, body, q=queue_name: callback(ch, method, properties, body, q, callback_arg)
+                lambda ch, method, properties, body, q=queue_name: callback(self, ch, method, properties, body, q, callback_arg)
             )
         self.connection.create_router('popular_90s_exchange', 'direct')
         self.connection.link_queue('popular_90s_books', 'popular_90s_exchange', 'popular_90s_queue')

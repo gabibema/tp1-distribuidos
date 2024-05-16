@@ -3,6 +3,7 @@ from json import dumps, loads
 import os
 from socket import SOCK_STREAM, socket, AF_INET, create_connection
 from multiprocessing import Process, Queue, Value
+import logging
 from time import time
 from lib.transfer.transfer_protocol import MESSAGE_FLAG, TransferProtocol
 from uuid import uuid4
@@ -90,9 +91,11 @@ class Client:
         while True:
             message, flag = protocol.receive_message()
             if flag == MESSAGE_FLAG['EOF']:
+                logging.warning(f'EOF received')
                 eof_count += 1
             elif flag == MESSAGE_FLAG['RESULT']:
                 body = loads(message)
+                logging.warning(f'Received message of length from Gateway')
                 self.__save_in_file(body['file'], body['body'])
             
             if eof_count == RESULT_FILES_AMOUNT:
