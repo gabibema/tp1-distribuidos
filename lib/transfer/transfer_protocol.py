@@ -23,7 +23,7 @@ class TransferProtocol:
         Sends a message given a socket connection avoiding short writes
         """
         total_sent = 0
-        full_message = f"{HEADER_DELIMETER}{len(message)}{SIZE_DELIMETER}{flag}{HEADER_DELIMETER}{message}".encode()
+        full_message = f"{HEADER_DELIMETER}{len(message.encode())}{SIZE_DELIMETER}{flag}{HEADER_DELIMETER}{message}".encode()
 
         try:
             while total_sent < len(full_message):
@@ -54,7 +54,7 @@ class TransferProtocol:
         except ValueError as e:
             raise ValueError(f"Error parsing header: expected format not found. {str(e)}")
         
-        return (size, flag, message_part)
+        return (size, flag, message_part.encode())
 
 
 
@@ -69,5 +69,5 @@ class TransferProtocol:
 
         size = int(size) 
         while len(message) < size:
-            message += self.conn.recv(size - len(message)).decode()
-        return (message, flag) 
+            message += self.conn.recv(size - len(message))
+        return (message.decode(), flag)
