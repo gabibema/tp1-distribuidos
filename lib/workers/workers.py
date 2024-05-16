@@ -10,13 +10,12 @@ WAIT_TIME_PIKA=5
 
 class Worker(ABC):
     def new(self, connection, src_queue='', src_exchange='', src_routing_key=[''], src_exchange_type=ExchangeType.direct, dst_exchange='', dst_routing_key='', dst_exchange_type=ExchangeType.direct):
-        self.id = str(uuid4())
         self.connection = connection
         self.connection.channel.basic_qos(prefetch_count=50, global_qos=True)
 
         # init source queue and bind to exchange
         self.connection.create_queue(src_queue, persistent=True)
-        self.connection.set_consumer(src_queue, self.callback)
+        self.src_queue = src_queue
 
         if src_exchange:
             self.connection.create_router(src_exchange, src_exchange_type)
@@ -39,6 +38,20 @@ class Worker(ABC):
         'Callback given to a RabbitMQ queue to invoke for each message in the queue'
         pass
 
+    def start(self):
+        self.connection.set_consumer(self.src_queue, self.callback)
+        self.connection.begin_consuming()
+
+    def end(self, ch, method, properties, body):
+        # nothing to do - MAY be overriden by subclasses.
+        pass
+
+
+class ParallelWorker(Worker):
+    def new(self, control_queue_prefix, *args, **kwargs):
+        super().new(*args, **kwargs)
+        self.connection.create_control_queue(control_queue_prefix, self.control_callback)
+
     def control_callback(self, ch, method, properties, body):
         'Callback given to a control queue to invoke for each message in the queue'
         message = json.loads(body)
@@ -51,6 +64,8 @@ class Worker(ABC):
             self.connection.send_message('', self.connection.next_peer, json.dumps(message))
         elif message.get('type') == 'SET_NEXT_PEER':
             self.connection.next_peer = message['peer_name']
+            # Worker is ready to process incoming messages, subscribe it to work queue.
+            self.connection.set_consumer(self.src_queue, self.callback)
         elif message.get('type') == 'EOF':
             if message['intended_recipient'] == self.id:
                 self.end(ch, method, properties, body)
@@ -58,20 +73,17 @@ class Worker(ABC):
                 self.connection.send_message('', self.connection.next_peer, body)
         self.connection.acknowledge_message(method.delivery_tag)
 
-    def start(self):
-        # Pending: Wait until self.connection.next_peer != None.
-        self.connection.begin_consuming()
-
     def end(self, ch, method, properties, body):
-        # nothing to do - MAY be overriden by subclasses.
-        pass
+        'Send EOF to next layer'
+        eof_message = json.loads(body)
+        del eof_message['intended_recipient']
+        self.connection.send_message(self.dst_exchange, self.routing_key, json.dumps(eof_message))
 
 
-class Filter(Worker):
-    def __init__(self, filter_condition, control_queue_prefix, connection, *args, **kwargs):
+class Filter(ParallelWorker):
+    def __init__(self, filter_condition, *args, **kwargs):
         self.filter_condition = filter_condition
-        super().new(connection=connection, *args, **kwargs)
-        self.connection.create_control_queue(control_queue_prefix, self.control_callback)
+        super().new(*args, **kwargs)
 
     def callback(self, ch, method, properties, body):
         'Callback given to a queue to invoke for each message in the queue'
@@ -84,18 +96,11 @@ class Filter(Worker):
             self.connection.send_message(self.dst_exchange, self.routing_key, body)
         self.connection.acknowledge_message(method.delivery_tag)
 
-    def end(self, ch, method, properties, body):
-        'Send EOF to next layer'
-        eof_message = json.loads(body)
-        del eof_message['intended_recipient']
-        self.connection.send_message(self.dst_exchange, self.routing_key, json.dumps(eof_message))
 
-
-class Map(Worker):
-    def __init__(self, map_fn, control_queue_prefix, connection, *args, **kwargs):
+class Map(ParallelWorker):
+    def __init__(self, map_fn, *args, **kwargs):
         self.map_fn = map_fn
-        super().new(connection=connection, *args, **kwargs)
-        self.connection.create_control_queue(control_queue_prefix, self.control_callback)
+        super().new(*args, **kwargs)
 
     def callback(self, ch, method, properties, body):
         'Callback given to a queue to invoke for each message in the queue'
@@ -108,19 +113,13 @@ class Map(Worker):
             self.connection.send_message(self.dst_exchange, self.routing_key, self.map_fn(body))
         self.connection.acknowledge_message(method.delivery_tag)
 
-    def end(self, ch, method, properties, body):
-        'Send EOF to next layer'
-        eof_message = json.loads(body)
-        del eof_message['intended_recipient']
-        self.connection.send_message(self.dst_exchange, self.routing_key, json.dumps(eof_message))
-
 
 class Aggregate(Worker):
-    def __init__(self, aggregate_fn, result_fn, accumulator, connection, *args, **kwargs):
+    def __init__(self, aggregate_fn, result_fn, accumulator, *args, **kwargs):
         self.aggregate_fn = aggregate_fn
         self.result_fn = result_fn
         self.accumulator = accumulator
-        super().new(connection=connection, *args, **kwargs)
+        super().new(*args, **kwargs)
 
     def callback(self, ch, method, properties, body):
         'Callback given to a queue to invoke for each message in the queue'
@@ -144,9 +143,9 @@ class Aggregate(Worker):
 
 
 class Router(Worker):
-    def __init__(self, routing_fn, connection, *args, **kwargs):
+    def __init__(self, routing_fn, *args, **kwargs):
         self.routing_fn = routing_fn
-        super().new(connection=connection, *args, **kwargs)
+        super().new(*args, **kwargs)
 
     def callback(self, ch, method, properties, body):
         'Callback given to a queue to invoke for each message in the queue'
