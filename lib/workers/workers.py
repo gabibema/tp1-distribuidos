@@ -50,6 +50,7 @@ class Worker(ABC):
 class ParallelWorker(Worker):
     def new(self, control_queue_prefix, *args, **kwargs):
         super().new(*args, **kwargs)
+        self.id = str(uuid4())
         self.connection.create_control_queue(control_queue_prefix, self.control_callback)
 
     def control_callback(self, ch, method, properties, body):

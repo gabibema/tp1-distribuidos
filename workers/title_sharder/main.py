@@ -20,7 +20,8 @@ def main():
     nineties_tmp_queues = [(f'90s_reviews_shard{shard_id}', f'reviews_shard{shard_id}') for shard_id in range(SHARD_COUNT)]
     tmp_queues = fiction_tmp_queues + nineties_tmp_queues
     connection = RabbitMQConnection(rabbit_hostname)
-    worker = DynamicRouter(routing_fn, tmp_queues=tmp_queues, connection=connection, src_queue=src_queue, dst_exchange=dst_exchange)
+    control_queue_prefix = 'ctrl_title_sharder'
+    worker = DynamicRouter(routing_fn, control_queue_prefix, tmp_queues=tmp_queues, connection=connection, src_queue=src_queue, dst_exchange=dst_exchange)
     worker.start()
 
 if __name__ == '__main__':
