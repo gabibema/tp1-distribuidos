@@ -28,8 +28,6 @@ class Client:
         self.reviews_sender = Process(target=self.__enqueue_file, args=(MESSAGE_FLAG['REVIEW'], self.reviews_path, self.reviews_queue))
 
 
-
-
     def start(self):
         self.books_sender.start()
         self.reviews_sender.start()
@@ -39,8 +37,8 @@ class Client:
         self.books_sender.join()
         self.reviews_sender.join()
         self.__save_results()
-        
-    
+
+
     def __try_connect(self, host, port, timeout=15):
         actual_time = time()
         while time() - actual_time < timeout:
@@ -49,24 +47,35 @@ class Client:
                 return conn
             except:
                 pass
-        
+
         raise SystemError('Could not connect to the server')    # not handled at the moment
-        
+
     def __enqueue_file(self, flag, path, queue):
+        # Batch message format:
+        """
+        {flag}{client_id},{message_id}
+        field1,field2,...
+        value1,value2,...
+        value1,value2,...
+        ...
+        """
+        message_id = 1
         with open(path, READ_MODE) as file:
-            headers = file.readline().strip()
-            batch = [self.uid, headers]
+            headers = file.readline()
+            batch = [f'{self.uid},{message_id}\n', headers]
 
             for line in file:
-                batch.append(line.strip())
-                if len(batch) >= self.batch_amount:
-                    queue.put((flag, '\n'.join(batch)))
-                    batch = [self.uid, headers]
+                batch.append(line)
+                if len(batch) - 2 >= self.batch_amount:
+                    queue.put((flag, ''.join(batch)))
+                    message_id += 1
+                    batch = [f'{self.uid},{message_id}\n', headers]
 
-            if batch:
-                queue.put((flag, '\n'.join(batch)))
+            if len(batch) > 2:
+                queue.put((flag, ''.join(batch)))
 
-            queue.put((flag, '\n'.join([self.uid, 'type', 'EOF'])))
+            batch = [f'{self.uid},{message_id + 1}', 'type', 'EOF']
+            queue.put((flag, '\n'.join(batch)))
 
     def __sending_completed(self, books_queue: Queue, reviews_queue: Queue):
         return books_queue.empty() and reviews_queue.empty() and not self.books_sender.is_alive() and not self.reviews_sender.is_alive()
