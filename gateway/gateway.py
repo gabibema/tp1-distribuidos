@@ -3,7 +3,7 @@ import logging
 from threading import Thread
 from socket import SOCK_STREAM, socket, AF_INET
 from pika.exchange_type import ExchangeType
-from lib.broker import WorkerBroker
+from lib.broker import MessageBroker
 from lib.gateway import BookPublisher, ResultReceiver, ReviewPublisher, MAX_KEY_LENGTH
 from lib.transfer.transfer_protocol import MESSAGE_FLAG, TransferProtocol
 from lib.workers.workers import wait_rabbitmq
@@ -30,7 +30,7 @@ class Gateway:
 
     def __handle_client(self, client):
         protocol = TransferProtocol(client)
-        connection = WorkerBroker("rabbitmq")
+        connection = MessageBroker("rabbitmq")
         result_receiver = ResultReceiver(connection, self.result_queues, callback_result_client, protocol)
         book_publisher = BookPublisher(connection, 'books_exchange', ExchangeType.topic)
         review_publisher = ReviewPublisher(connection)
@@ -38,12 +38,12 @@ class Gateway:
         eof_count = 0
         while True:
             message, flag = protocol.receive_message()
-                
+
             if flag == MESSAGE_FLAG['BOOK']:
                 eof_count += book_publisher.publish(message, get_books_keys)
             elif flag == MESSAGE_FLAG['REVIEW']:
                 eof_count += review_publisher.publish(message, 'reviews_queue')
-            
+
             if eof_count == 2:
                 break
 
@@ -52,7 +52,7 @@ class Gateway:
 
 
     def __wait_workers(self):
-        connection = WorkerBroker("rabbitmq")
+        connection = MessageBroker("rabbitmq")
         book_publisher = BookPublisher(connection, 'books_exchange', ExchangeType.topic)
         review_publisher = ReviewPublisher(connection)
         result_receiver = ResultReceiver(connection, self.result_queues, callback_result, self.result_queues.copy())

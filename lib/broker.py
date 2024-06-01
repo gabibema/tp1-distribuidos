@@ -4,7 +4,7 @@ from uuid import uuid4
 import json
 import pika
 
-class WorkerBroker():
+class MessageBroker():
     def __init__(self, hostname):
         self.wait_connection()
         self.connection = pika.BlockingConnection(pika.ConnectionParameters(host=hostname))
