@@ -71,3 +71,17 @@ class TransferProtocol:
         while len(message) < size:
             message += self.conn.recv(size - len(message))
         return (message.decode(), flag)
+
+
+from multiprocessing import Manager
+
+class RouterProtocol:
+    def __init__(self) -> None:
+        manager = Manager()
+        self.router = manager.dict()
+
+    def add_connection(self, connection:TransferProtocol, uid: str) -> None:
+        self.router[uid] = connection
+    
+    def send_message(self, message:str, flag:str, uid:str) -> None:
+        self.router[uid].send_message(message, flag)

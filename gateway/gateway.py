@@ -1,11 +1,11 @@
 import json
 import logging
-from threading import Thread
+from multiprocessing import Process
 from socket import SOCK_STREAM, socket, AF_INET
 from pika.exchange_type import ExchangeType
 from lib.broker import WorkerBroker
 from lib.gateway import BookPublisher, ResultReceiver, ReviewPublisher, MAX_KEY_LENGTH
-from lib.transfer.transfer_protocol import MESSAGE_FLAG, TransferProtocol
+from lib.transfer.transfer_protocol import MESSAGE_FLAG, RouterProtocol, TransferProtocol
 from lib.workers.workers import wait_rabbitmq
 
 CLIENTS_BACKLOG = 5
@@ -14,6 +14,7 @@ class Gateway:
     def __init__(self, config):
         self.result_queues = config['result_queues']
         self.port = config['port']
+        self.router = RouterProtocol()
         self.conn = None
 
     def start(self):
@@ -25,10 +26,10 @@ class Gateway:
         while True:
             self.conn.listen(CLIENTS_BACKLOG)
             client, addr = self.conn.accept()
-            Thread(target=self.__handle_client, args=(client,)).start()
+            Process(target=self.__handle_client, args=(client, self.router)).start()
 
 
-    def __handle_client(self, client):
+    def __handle_client(self, client, router: RouterProtocol):
         protocol = TransferProtocol(client)
         connection = WorkerBroker("rabbitmq")
         result_receiver = ResultReceiver(connection, self.result_queues, callback_result_client, protocol)
@@ -36,6 +37,7 @@ class Gateway:
         review_publisher = ReviewPublisher(connection)
 
         eof_count = 0
+        client_routed = False
         while True:
             message, flag = protocol.receive_message()
                 
@@ -43,6 +45,10 @@ class Gateway:
                 eof_count += book_publisher.publish(message, get_books_keys)
             elif flag == MESSAGE_FLAG['REVIEW']:
                 eof_count += review_publisher.publish(message, 'reviews_queue')
+
+            if not client_routed:
+                router.add_connection(protocol, get_uid_raw(message))
+                client_routed = True
             
             if eof_count == 2:
                 break
@@ -66,16 +72,17 @@ class Gateway:
         result_receiver.close()
 
 
-def callback_result_client(self, ch, method, properties, body, queue_name, callback_arg: TransferProtocol):
+def callback_result_client(self, ch, method, properties, body, queue_name, callback_arg: RouterProtocol):
     body = json.loads(body)
 
     if 'type' in body:
-        callback_arg.send_message(json.dumps({'file': queue_name}), MESSAGE_FLAG['EOF'])
+        callback_arg.send_message(json.dumps({'file': queue_name}), MESSAGE_FLAG['EOF'], body['request_id'])
     else:
-        callback_arg.send_message(json.dumps({'file':queue_name, 'body':body}), MESSAGE_FLAG['RESULT'])
+        uid = get_uid(body)
+        callback_arg.send_message(json.dumps({'file':queue_name, 'body':body}), MESSAGE_FLAG['RESULT'], uid)
     
     self.connection.acknowledge_message(method.delivery_tag)
-    
+
 
 def callback_result(ch, method, properties, body, queue_name, callback_arg):
     body = json.loads(body)
@@ -86,6 +93,19 @@ def callback_result(ch, method, properties, body, queue_name, callback_arg):
 
     if not callback_arg:
         ch.stop_consuming()
+
+def get_uid_raw(message):
+    parts = message.split('\n', 1)
+    if len(parts) > 0:
+        return parts[0]
+    return None
+    
+
+def get_uid(body):
+    if isinstance(body, dict) and 'request_id' in body:
+        return body['request_id']
+    elif isinstance(body, list) and body and 'request_id' in body[0]:
+        return body[0]['request_id']
 
 
 def get_books_keys(row):
