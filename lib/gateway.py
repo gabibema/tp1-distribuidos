@@ -2,6 +2,7 @@ from io import StringIO
 from csv import DictReader
 import logging
 import json
+import uuid
 
 MAX_KEY_LENGTH = 255
 NOT_EOF_VALUE = 0
@@ -88,6 +89,7 @@ class ResultReceiver():
         self.connection = connection
         self.callback = callback
         self.callback_arg = callback_arg
+        self.id = uuid.uuid4()
         for queue_name in queues:
             self.connection.create_queue(queue_name, True)
             self.connection.set_consumer(

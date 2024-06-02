@@ -2,6 +2,7 @@ from socket import socket
 from typing import Tuple
 import logging
 import struct # for encoding
+import uuid
 
 MESSAGE_FLAG = {
     'BOOK': b'\x01',
@@ -11,19 +12,19 @@ MESSAGE_FLAG = {
     'ERROR': b'\x05'
 }
 
-LENGTH_FORMAT = '!L'
+BYTES_HEADER_SIZE = 4
+MESSAGE_HEADER_SIZE = 1 + 16 + 4 # flag + client_uuid + message_id.
 
-class TransferProtocol:
+class ByteTransferProtocol:
     def __init__(self, conn: socket):
         self.conn = conn
 
-    def send_message(self, message: str):
+    def send_bytes(self, payload: bytes):
         """
-        Sends a message given a socket connection avoiding short writes
+        Sends bytes given a socket connection avoiding short writes
         """
         total_sent = 0
-        payload = message.encode('utf-8')
-        length = struct.pack(LENGTH_FORMAT, len(payload))
+        length = struct.pack('!L', len(payload))
         full_message = length + payload
 
         try:
@@ -35,28 +36,40 @@ class TransferProtocol:
             return None
         return total_sent
 
-
-    def read_header(self) -> Tuple[str,str,str]:
+    def read_header(self) -> Tuple[int,bytes]:
         """
-        Reads both the initial and final header of a message from a socket in 16-byte blocks,
-        ensuring that two delimiters are received to complete the header.
+        Reads the header indicating the amount of bytes that follow.
         """
         buffer = b''
-        length_header_bytes = struct.calcsize(LENGTH_FORMAT)
-        while len(buffer) < length_header_bytes:
+        while len(buffer) < BYTES_HEADER_SIZE:
             chunk = self.conn.recv(HEADER_CHUNK_SIZE)
             buffer += chunk
         
         length, payload = buffer[:4], buffer[4:]
-        return struct.unpack(LENGTH_FORMAT, length)[0], payload
+        return struct.unpack('!L', length)[0], payload
 
-
-
-    def receive_message(self) -> Tuple[str,str]:
+    def receive_bytes(self) -> bytes:
         """
-        Receives a message from a socket avoiding short reads
+        Receives bytes from a socket avoiding short reads
         """
-        length, message = self.read_header()
-        while len(message) < length:
-            message += self.conn.recv(length - len(message))
-        return message.decode()
+        length, payload = self.read_header()
+        while len(payload) < length:
+            payload += self.conn.recv(length - len(payload))
+        return payload
+
+
+class MessageTransferProtocol(ByteTransferProtocol):
+    def send_message(self, flag: bytes, client_id: uuid.UUID, message_id: int, message: str):
+        """
+        Sends a message given a socket connection.
+        """
+        payload = flag + client_id.bytes + struct.pack('!L', message_id) + message.encode('utf-8')
+        return super().send_bytes(payload)
+
+    def receive_message(self) -> Tuple[bytes,uuid.UUID,int,str]:
+        """
+        Receives a message from a socket.
+        """
+        payload = super().receive_bytes()
+        flag, client_id, message_id, message = payload[0], payload[1:17], payload[17:21], payload[21:]
+        return flag, uuid.UUID(bytes=client_id), struct.unpack('!L', message_id), message.decode('utf-8')

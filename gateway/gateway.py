@@ -5,7 +5,7 @@ from socket import SOCK_STREAM, socket, AF_INET
 from pika.exchange_type import ExchangeType
 from lib.broker import MessageBroker
 from lib.gateway import BookPublisher, ResultReceiver, ReviewPublisher, MAX_KEY_LENGTH
-from lib.transfer.transfer_protocol import MESSAGE_FLAG, TransferProtocol
+from lib.transfer.transfer_protocol import MESSAGE_FLAG, MessageTransferProtocol
 from lib.workers.workers import wait_rabbitmq
 
 CLIENTS_BACKLOG = 5
@@ -29,7 +29,7 @@ class Gateway:
 
 
     def __handle_client(self, client):
-        protocol = TransferProtocol(client)
+        protocol = MessageTransferProtocol(client)
         connection = MessageBroker("rabbitmq")
         result_receiver = ResultReceiver(connection, self.result_queues, callback_result_client, protocol)
         book_publisher = BookPublisher(connection, 'books_exchange', ExchangeType.topic)
@@ -37,7 +37,7 @@ class Gateway:
 
         eof_count = 0
         while True:
-            message, flag = protocol.receive_message()
+            flag, client_id, message_id, message = protocol.receive_message()
 
             if flag == MESSAGE_FLAG['BOOK']:
                 eof_count += book_publisher.publish(message, get_books_keys)
@@ -66,13 +66,14 @@ class Gateway:
         result_receiver.close()
 
 
-def callback_result_client(self, ch, method, properties, body, queue_name, callback_arg: TransferProtocol):
+def callback_result_client(self, ch, method, properties, body, queue_name, callback_arg: MessageTransferProtocol):
     body = json.loads(body)
-
-    if 'type' in body:
-        callback_arg.send_message(json.dumps({'file': queue_name}), MESSAGE_FLAG['EOF'])
+    # PENDING: propagate message_id all they way back to the client.
+    message_id = 1
+    if body.get('type') == 'EOF':
+        callback_arg.send_message(MESSAGE_FLAG['EOF'], self.id, message_id, json.dumps({'file': queue_name}))
     else:
-        callback_arg.send_message(json.dumps({'file':queue_name, 'body':body}), MESSAGE_FLAG['RESULT'])
+        callback_arg.send_message(MESSAGE_FLAG['RESULT'], self.id, message_id, json.dumps({'file':queue_name, 'body':body}))
     
     self.connection.acknowledge_message(method.delivery_tag)
     
@@ -81,7 +82,7 @@ def callback_result(ch, method, properties, body, queue_name, callback_arg):
     body = json.loads(body)
     logging.warning(f'Received message of length {len(body)} from {queue_name}: {body}')
 
-    if 'type' in body and body['type'] == 'EOF':
+    if body.get('type') == 'EOF':
         callback_arg.remove(queue_name)
 
     if not callback_arg:

@@ -1,12 +1,13 @@
+import os
+from multiprocessing import Process, Queue, Value
+from socket import SOCK_STREAM, socket, AF_INET, create_connection
+from time import time
+from uuid import uuid4
 from csv import DictWriter
 from json import dumps, loads
-import os
-from socket import SOCK_STREAM, socket, AF_INET, create_connection
-from multiprocessing import Process, Queue, Value
 import logging
-from time import time
-from lib.transfer.transfer_protocol import MESSAGE_FLAG, TransferProtocol
-from uuid import uuid4
+
+from lib.transfer.transfer_protocol import MESSAGE_FLAG, MessageTransferProtocol
 
 READ_MODE = 'r'
 RESULT_FILES_AMOUNT = 5
@@ -20,12 +21,12 @@ class Client:
         self.reviews_path = config['reviews_path']
 
         self.output_dir = config['output_dir']
-        self.uid = str(uuid4())
+        self.uuid = uuid4()
 
         self.books_queue = Queue()
         self.reviews_queue = Queue()
-        self.books_sender = Process(target=self.__enqueue_file, args=(MESSAGE_FLAG['BOOK'], self.books_path, self.books_queue))
-        self.reviews_sender = Process(target=self.__enqueue_file, args=(MESSAGE_FLAG['REVIEW'], self.reviews_path, self.reviews_queue))
+        self.books_sender = Process(target=self.__enqueue_file, args=(self.books_path, self.books_queue))
+        self.reviews_sender = Process(target=self.__enqueue_file, args=(self.reviews_path, self.reviews_queue))
 
 
     def start(self):
@@ -50,63 +51,62 @@ class Client:
 
         raise SystemError('Could not connect to the server')    # not handled at the moment
 
-    def __enqueue_file(self, flag, path, queue):
+    def __enqueue_file(self, path, queue):
         # Batch message format:
-        """
-        flag,client_id,message_id
-        field1,field2,...
-        value1,value2,...
-        value1,value2,...
-        ...
-        """
+        # field1,field2,...
+        # value1,value2,...
+        # value1,value2,...
+        # ...
         message_id = 1
         with open(path, READ_MODE) as file:
             headers = file.readline()
-            batch = [f'{self.uid},{message_id}\n', headers]
+            batch = [headers]
 
             for line in file:
                 batch.append(line)
-                if len(batch) - 2 >= self.batch_amount:
-                    queue.put((flag, ''.join(batch)))
+                if len(batch) - 1 >= self.batch_amount:
+                    batch[-1] = batch[-1].rstrip()
+                    queue.put((message_id, ''.join(batch)))
                     message_id += 1
-                    batch = [f'{self.uid},{message_id}\n', headers]
+                    batch = [headers]
 
-            if len(batch) > 2:
-                queue.put((flag, ''.join(batch)))
+            if len(batch) > 1:
+                batch[-1] = batch[-1].rstrip()
+                queue.put((message_id, ''.join(batch)))
 
-            batch = [f'{self.uid},{message_id + 1}', 'type', 'EOF']
-            queue.put((flag, '\n'.join(batch)))
+            batch = ['type', 'EOF']
+            queue.put((message_id + 1, '\n'.join(batch)))
 
     def __sending_completed(self, books_queue: Queue, reviews_queue: Queue):
         return books_queue.empty() and reviews_queue.empty() and not self.books_sender.is_alive() and not self.reviews_sender.is_alive()
 
     def __send_from_queue(self, books_queue: Queue, reviews_queue: Queue):
-        protocol = TransferProtocol(self.conn)
-        
+        protocol = MessageTransferProtocol(self.conn)
+
         while True:
             if not books_queue.empty():
-                flag, message = books_queue.get()
-                protocol.send_message(message, flag)
+                message_id, message = books_queue.get()
+                protocol.send_message(MESSAGE_FLAG['BOOK'], self.uuid, message_id, message)
             if not reviews_queue.empty():
-                flag, message = reviews_queue.get()
-                protocol.send_message(message, flag)
-            
+                message_id, message = reviews_queue.get()
+                protocol.send_message(MESSAGE_FLAG['REVIEW'], self.uuid, message_id, message)
+
             if self.__sending_completed(books_queue, reviews_queue):
                 break
-    
+
     def __save_results(self):
-        protocol = TransferProtocol(self.conn)
+        protocol = MessageTransferProtocol(self.conn)
         eof_count = 0
         while True:
-            message, flag = protocol.receive_message()
+            flag, _gateway_id, message_id, message = protocol.receive_message()
             if flag == MESSAGE_FLAG['EOF']:
                 logging.warning(f'EOF received')
                 eof_count += 1
             elif flag == MESSAGE_FLAG['RESULT']:
                 body = loads(message)
-                logging.warning(f'Received message of length from Gateway')
+                logging.warning(f"Received message with ID '{message_id}' from Gateway'")
                 self.__save_in_file(body['file'], body['body'])
-            
+
             if eof_count == RESULT_FILES_AMOUNT:
                 break
 
@@ -123,16 +123,16 @@ class Client:
 
         if isinstance(body, dict):
             if 'request_id' in body:
-                body.pop('request_id')
+                del body['request_id']
             body = [body]
-        else: 
+        else:
             for row in body:
                 if 'request_id' in row:
                     row.pop('request_id')
-        
+
         with open(filepath, 'a+', newline='') as file:
             writer = DictWriter(file, fieldnames=body[0].keys())
             if not file_exists or file.tell() == 0:
                 writer.writeheader()
-            
+
             writer.writerows(body)
