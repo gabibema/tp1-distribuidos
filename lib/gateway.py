@@ -5,8 +5,6 @@ import json
 import uuid
 
 MAX_KEY_LENGTH = 255
-NOT_EOF_VALUE = 0
-EOF_VALUE = 1
 
 class BookPublisher():
     def __init__(self, connection, dst_exchange, dst_exchange_type):
@@ -14,16 +12,13 @@ class BookPublisher():
         self.exchange = dst_exchange
         self.connection.create_router(dst_exchange, dst_exchange_type)
 
-    def publish(self, message, routing_key_fn):
-        csv_stream = StringIO(message)
-        uid = csv_stream.readline().strip()
-        reader = DictReader(csv_stream)
-
-        eof_received = NOT_EOF_VALUE
+    def publish(self, client_id, message_id, message, routing_key_fn):
+        eof_received = False
+        reader = DictReader(StringIO(message))
         for row in reader:
-            row_filtered = {'request_id': uid}
+            row_filtered = {'request_id': str(client_id), 'message_id': message_id}
             if 'type' in row:
-                eof_received = EOF_VALUE if 'EOF' in row['type'] else NOT_EOF_VALUE
+                eof_received |= 'EOF' in row['type']
                 row_filtered['type'] = row['type']
             if 'Title' in row:
                 row_filtered['Title'] = row['Title']
@@ -37,11 +32,11 @@ class BookPublisher():
             routing_key = routing_key_fn(row_filtered)
             self.connection.send_message(self.exchange, routing_key, json.dumps(row_filtered))
 
-        if eof_received == EOF_VALUE:
-            logging.warning(f'{uid} EOF received')
-        else: 
+        if eof_received:
+            logging.warning(f'{client_id} EOF received')
+        else:
             logging.warning(f'Received message of length {len(message)}')
-        
+
         return eof_received
     
     def close(self):
@@ -52,15 +47,12 @@ class ReviewPublisher():
     def __init__(self, connection):
         self.connection = connection
 
-    def publish(self, message, routing_key):
-        csv_stream = StringIO(message)
-        uid = csv_stream.readline().strip()
-
-        eof_received = NOT_EOF_VALUE
-        reader = DictReader(csv_stream)
+    def publish(self, client_id, message_id, message, routing_key):
+        eof_received = False
+        reader = DictReader(StringIO(message))
         rows = []
         for row in reader:
-            current_row = {'request_id': uid}
+            current_row = {'request_id': str(client_id), 'message_id': message_id}
             if 'Title' in row:
                 current_row['Title'] = row['Title']
             if 'review/text' in row:
@@ -70,9 +62,9 @@ class ReviewPublisher():
             if len(current_row) > 1:
                 rows.append(current_row)
     
-        if len(rows) == 1 and 'type' in rows[0] and 'EOF' in rows[0]['type']:
-            eof_received = EOF_VALUE
-            logging.warning(f'{uid} EOF received')
+        if len(rows) == 1 and rows[0].get('type') == 'EOF':
+            eof_received = True
+            logging.warning(f'{client_id} EOF received')
         else:
             logging.warning(f'Received message of length {len(message)}')
         

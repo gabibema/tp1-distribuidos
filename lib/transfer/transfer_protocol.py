@@ -5,11 +5,11 @@ import struct # for encoding
 import uuid
 
 MESSAGE_FLAG = {
-    'BOOK': b'\x01',
-    'REVIEW': b'\x02',
-    'RESULT': b'\x03',
-    'EOF': b'\x04',
-    'ERROR': b'\x05'
+    'BOOK': 1,
+    'REVIEW': 2,
+    'RESULT': 3,
+    'EOF': 4,
+    'ERROR': 5
 }
 
 BYTES_HEADER_SIZE = 4
@@ -42,7 +42,7 @@ class ByteTransferProtocol:
         """
         buffer = b''
         while len(buffer) < BYTES_HEADER_SIZE:
-            chunk = self.conn.recv(HEADER_CHUNK_SIZE)
+            chunk = self.conn.recv(BYTES_HEADER_SIZE - len(buffer))
             buffer += chunk
         
         length, payload = buffer[:4], buffer[4:]
@@ -52,18 +52,18 @@ class ByteTransferProtocol:
         """
         Receives bytes from a socket avoiding short reads
         """
-        length, payload = self.read_header()
-        while len(payload) < length:
-            payload += self.conn.recv(length - len(payload))
-        return payload
+        length, buffer = self.read_header()
+        while len(buffer) < length:
+            buffer += self.conn.recv(length - len(buffer))
+        return buffer
 
 
 class MessageTransferProtocol(ByteTransferProtocol):
-    def send_message(self, flag: bytes, client_id: uuid.UUID, message_id: int, message: str):
+    def send_message(self, flag: int, client_id: uuid.UUID, message_id: int, message: str):
         """
         Sends a message given a socket connection.
         """
-        payload = flag + client_id.bytes + struct.pack('!L', message_id) + message.encode('utf-8')
+        payload = struct.pack('!B', flag) + client_id.bytes + struct.pack('!L', message_id) + message.encode('utf-8')
         return super().send_bytes(payload)
 
     def receive_message(self) -> Tuple[bytes,uuid.UUID,int,str]:

@@ -29,6 +29,7 @@ class Gateway:
 
 
     def __handle_client(self, client):
+        logging.warning(f'New client connection: {client}')
         protocol = MessageTransferProtocol(client)
         connection = MessageBroker("rabbitmq")
         result_receiver = ResultReceiver(connection, self.result_queues, callback_result_client, protocol)
@@ -38,12 +39,12 @@ class Gateway:
         eof_count = 0
         while True:
             flag, client_id, message_id, message = protocol.receive_message()
-
             if flag == MESSAGE_FLAG['BOOK']:
-                eof_count += book_publisher.publish(message, get_books_keys)
+                eof_count += book_publisher.publish(client_id, message_id, message, get_books_keys)
             elif flag == MESSAGE_FLAG['REVIEW']:
-                eof_count += review_publisher.publish(message, 'reviews_queue')
-
+                eof_count += review_publisher.publish(client_id, message_id, message, 'reviews_queue')
+            else:
+                logging.error(f'Unsupported message flag {repr(flag)}')
             if eof_count == 2:
                 break
 
