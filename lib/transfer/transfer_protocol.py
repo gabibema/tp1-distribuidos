@@ -1,29 +1,30 @@
 from socket import socket
-import logging
 from typing import Tuple
+import logging
+import struct # for encoding
 
 MESSAGE_FLAG = {
-    'BOOK': '1',
-    'REVIEW': '2',
-    'RESULT': '3',
-    'EOF': '4',
-    'ERROR': '5'
+    'BOOK': b'\x01',
+    'REVIEW': b'\x02',
+    'RESULT': b'\x03',
+    'EOF': b'\x04',
+    'ERROR': b'\x05'
 }
 
-SIZE_DELIMETER = ';'
-HEADER_DELIMETER = '|'
-HEADER_CHUNK_SIZE = 16
+LENGTH_FORMAT = '!L'
 
 class TransferProtocol:
     def __init__(self, conn: socket):
         self.conn = conn
 
-    def send_message(self, message: str, flag: str):
+    def send_message(self, message: str):
         """
         Sends a message given a socket connection avoiding short writes
         """
         total_sent = 0
-        full_message = f"{HEADER_DELIMETER}{len(message.encode())}{SIZE_DELIMETER}{flag}{HEADER_DELIMETER}{message}".encode()
+        payload = message.encode('utf-8')
+        length = struct.pack(LENGTH_FORMAT, len(payload))
+        full_message = length + payload
 
         try:
             while total_sent < len(full_message):
@@ -35,26 +36,19 @@ class TransferProtocol:
         return total_sent
 
 
-    def __read_header(self) -> Tuple[str,str,str]:
+    def read_header(self) -> Tuple[str,str,str]:
         """
         Reads both the initial and final header of a message from a socket in 16-byte blocks,
         ensuring that two delimiters are received to complete the header.
         """
         buffer = b''
-        while True:
+        length_header_bytes = struct.calcsize(LENGTH_FORMAT)
+        while len(buffer) < length_header_bytes:
             chunk = self.conn.recv(HEADER_CHUNK_SIZE)
             buffer += chunk
-            if buffer.count(HEADER_DELIMETER.encode()) >= 2:
-                break
         
-        header_and_message = buffer.decode()
-        try:
-            _, header_part, message_part = header_and_message.split(HEADER_DELIMETER, 2)
-            size, flag = header_part.split(SIZE_DELIMETER)
-        except ValueError as e:
-            raise ValueError(f"Error parsing header: expected format not found. {str(e)}")
-        
-        return (size, flag, message_part.encode())
+        length, payload = buffer[:4], buffer[4:]
+        return struct.unpack(LENGTH_FORMAT, length)[0], payload
 
 
 
@@ -62,12 +56,7 @@ class TransferProtocol:
         """
         Receives a message from a socket avoiding short reads
         """
-        try: 
-            size, flag, message = self.__read_header()
-        except ValueError:
-            return ("", MESSAGE_FLAG["ERROR"])
-
-        size = int(size) 
-        while len(message) < size:
-            message += self.conn.recv(size - len(message))
-        return (message.decode(), flag)
+        length, message = self.read_header()
+        while len(message) < length:
+            message += self.conn.recv(length - len(message))
+        return message.decode()
