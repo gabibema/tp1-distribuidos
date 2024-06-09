@@ -8,7 +8,8 @@ NOT_EOF_VALUE = 0
 EOF_VALUE = 1
 
 class BookPublisher():
-    def __init__(self, connection, dst_exchange, dst_exchange_type):
+    def __init__(self, connection, dst_exchange, dst_exchange_type, data_saver):
+        self.data_saver = data_saver
         self.connection = connection
         self.exchange = dst_exchange
         self.connection.create_router(dst_exchange, dst_exchange_type)
@@ -18,8 +19,10 @@ class BookPublisher():
         uid = csv_stream.readline().strip()
         reader = DictReader(csv_stream)
 
+        last_row = None
         eof_received = NOT_EOF_VALUE
         for row in reader:
+            last_row = row
             row_filtered = {'request_id': uid}
             if 'type' in row:
                 eof_received = EOF_VALUE if 'EOF' in row['type'] else NOT_EOF_VALUE
@@ -40,7 +43,8 @@ class BookPublisher():
             logging.warning(f'{uid} EOF received')
         else: 
             logging.warning(f'Received message of length {len(message)}')
-        
+        if last_row:
+            self.data_saver.save_message_to_json(uid, last_row)
         return eof_received
     
     def close(self):
@@ -48,7 +52,8 @@ class BookPublisher():
         self.connection.connection.close()
 
 class ReviewPublisher():
-    def __init__(self, connection):
+    def __init__(self, connection, data_saver):
+        self.data_saver = data_saver
         self.connection = connection
 
     def publish(self, message, routing_key):
@@ -73,10 +78,11 @@ class ReviewPublisher():
             eof_received = EOF_VALUE
             logging.warning(f'{uid} EOF received')
         else:
-            logging.warning(f'Received message of length {len(message)}')
-        
+            logging.warning(f'Received message of length {len(message)}') 
         full_message = json.dumps(rows)
         self.connection.send_message('', routing_key, full_message)
+        if rows:
+            self.data_saver.save_message_to_json(uid, rows[-1])
         return eof_received
     
     def close(self):

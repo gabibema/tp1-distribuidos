@@ -3,6 +3,7 @@ import logging
 from multiprocessing import Process
 from socket import SOCK_STREAM, socket, AF_INET
 from pika.exchange_type import ExchangeType
+from gateway.data_storage import DataSaver
 from lib.broker import WorkerBroker
 from lib.gateway import BookPublisher, ResultReceiver, ReviewPublisher, MAX_KEY_LENGTH
 from lib.transfer.transfer_protocol import MESSAGE_FLAG, RouterProtocol, TransferProtocol
@@ -15,6 +16,7 @@ class Gateway:
         self.result_queues = config['result_queues']
         self.port = config['port']
         self.router = RouterProtocol()
+        self.data_saver = DataSaver(config['records_path'])
         self.conn = None
 
     def start(self):
@@ -33,8 +35,8 @@ class Gateway:
         protocol = TransferProtocol(client)
         connection = WorkerBroker("rabbitmq")
         result_receiver = ResultReceiver(connection, self.result_queues, callback_result_client, protocol)
-        book_publisher = BookPublisher(connection, 'books_exchange', ExchangeType.topic)
-        review_publisher = ReviewPublisher(connection)
+        book_publisher = BookPublisher(connection, 'books_exchange', ExchangeType.topic, self.data_saver)
+        review_publisher = ReviewPublisher(connection, self.data_saver)
 
         eof_count = 0
         client_routed = False
