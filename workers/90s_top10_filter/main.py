@@ -1,6 +1,6 @@
 import json
 from heapq import nlargest
-from lib.broker import WorkerBroker
+from lib.broker import MessageBroker
 from lib.workers import Aggregate
 
 def aggregate(msg, accumulator):
@@ -21,7 +21,7 @@ def main():
     src_exchange='popular_90s_exchange'
     dst_routing_key = 'top_90s_books'
     accumulator = {}
-    connection = WorkerBroker(rabbit_hostname)
+    connection = MessageBroker(rabbit_hostname)
     worker = Aggregate(aggregate, result, accumulator, connection=connection, src_queue=src_queue, src_exchange=src_exchange, src_routing_key=src_routing_key, dst_routing_key=dst_routing_key)
     worker.start()
 

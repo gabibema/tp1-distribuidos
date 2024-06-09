@@ -1,6 +1,6 @@
 import json
 from pika.exchange_type import ExchangeType
-from lib.broker import WorkerBroker
+from lib.broker import MessageBroker
 from lib.workers import Filter
 
 def category_filter(body):
@@ -19,7 +19,7 @@ def main():
     src_routing_key = '#'
     dst_exchange = 'fiction_filtered_exchange'
     dst_routing_key = 'fiction_filtered_queue'
-    connection = WorkerBroker(rabbit_hostname)
+    connection = MessageBroker(rabbit_hostname)
     control_queue_prefix = 'ctrl_fiction_category_filter'
     worker = Filter(category_filter, control_queue_prefix, connection=connection, src_queue=src_queue, src_exchange=src_exchange, src_routing_key=src_routing_key, src_exchange_type=ExchangeType.topic, dst_exchange=dst_exchange, dst_routing_key=dst_routing_key)
     worker.start()
