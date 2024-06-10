@@ -6,8 +6,10 @@ services:
       - ./config/client.ini:/app/config.ini
       - ./lib:/app/lib
       - ./data:/app/data
+    environment:
+      - CLIENT_ID=f412e42c-8f80-4d1c-882f-fac6a88d8465
     networks:
-      - default
+      - default 
 
 networks:
   default:

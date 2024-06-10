@@ -15,6 +15,7 @@ def get_config_params():
             'batch_amount': int(os.getenv('BATCH_AMOUNT', default=config['DEFAULT'].get('BATCH_AMOUNT'))),
             'port': int(os.getenv('PORT', default=config['DEFAULT'].get('PORT'))),
             'log_level': os.getenv('LOG_LEVEL', default=config['DEFAULT'].get('LOG_LEVEL')),
+            'client_id': os.getenv('CLIENT_ID'),
         }
         print(config_params)
     except KeyError as e:

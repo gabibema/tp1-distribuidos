@@ -44,21 +44,24 @@ class Gateway:
         client_routed = False
         while True:
             flag, client_id, message_id, message = protocol.receive_message()
+            if not client_routed:
+                router.add_connection(protocol, client_id)
+                client_routed = True
             if flag == MESSAGE_FLAG['BOOK']:
                 eof_count += book_publisher.publish(client_id, message_id, message, get_books_keys)
             elif flag == MESSAGE_FLAG['REVIEW']:
                 eof_count += review_publisher.publish(client_id, message_id, message, 'reviews_queue')
+            elif flag == MESSAGE_FLAG['CHECKPOINT']:
+                client_checkpoint = self.data_saver.shared_last_rows.get(str(client_id), {})
+                protocol.send_message(MESSAGE_FLAG['CHECKPOINT'], client_id, message_id, json.dumps(dict(client_checkpoint)))
             else:
                 logging.error(f'Unsupported message flag {repr(flag)}')
-
-            if not client_routed:
-                router.add_connection(protocol, client_id)
-                client_routed = True
-                
             if eof_count == 2:
                 break
 
-        logging.warning('EOF received from both files')
+        normal_dict = {k: dict(v) for k, v in self.data_saver.shared_last_rows.items()}
+        logging.warning(f'Final dict is: {normal_dict}')
+
         result_receiver.start()
 
 

@@ -2,6 +2,7 @@ import os
 from multiprocessing import Process, Queue, Value
 from socket import SOCK_STREAM, socket, AF_INET, create_connection
 from time import time
+from uuid import UUID
 from uuid import uuid4
 from csv import DictWriter
 from json import dumps, loads
@@ -16,12 +17,13 @@ class Client:
     def __init__(self, config):
         self.port = config['port']
         self.batch_amount = config['batch_amount']
+        self.checkpoint = None
         
         self.books_path = config['books_path']
         self.reviews_path = config['reviews_path']
 
         self.output_dir = config['output_dir']
-        self.uuid = uuid4()
+        self.uuid = UUID(config['client_id'])
 
         self.books_queue = Queue()
         self.reviews_queue = Queue()
@@ -34,6 +36,8 @@ class Client:
         self.reviews_sender.start()
         
         self.conn = self.__try_connect('gateway', self.port)
+        self.checkpoint = self.__request_checkpoint()
+        logging.warning(f'Checkpoint received: {self.checkpoint}')
         self.__send_from_queue(self.books_queue, self.reviews_queue)
         self.books_sender.join()
         self.reviews_sender.join()
@@ -50,6 +54,16 @@ class Client:
                 pass
 
         raise SystemError('Could not connect to the server')    # not handled at the moment
+
+    def __request_checkpoint(self):
+        protocol = MessageTransferProtocol(self.conn)
+        protocol.send_message(MESSAGE_FLAG['CHECKPOINT'], self.uuid, 1, '')
+        flag, _gateway_id, message_id, message = protocol.receive_message()
+
+        if flag == MESSAGE_FLAG['CHECKPOINT']:
+            return loads(message)
+        else:
+            raise SystemError('Invalid response from the server')    # not handled at the moment
 
     def __enqueue_file(self, path, queue):
         # Batch message format:

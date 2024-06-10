@@ -10,7 +10,8 @@ MESSAGE_FLAG = {
     'REVIEW': 2,
     'RESULT': 3,
     'EOF': 4,
-    'ERROR': 5
+    'CHECKPOINT': 5,
+    'ERROR': 6
 }
 
 BYTES_HEADER_SIZE = 4
