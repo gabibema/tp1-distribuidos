@@ -4,6 +4,8 @@ import logging
 import json
 import uuid
 
+from lib.transfer.transfer_protocol import MESSAGE_FLAG
+
 MAX_KEY_LENGTH = 255
 
 class BookPublisher():
@@ -42,7 +44,8 @@ class BookPublisher():
             logging.warning(f'Received message of length {len(message)}')
 
         if last_row:
-            self.data_saver.save_message_to_json(client_id, last_row)
+            message = {'client_id': str(client_id), 'message_id': message_id, 'source': MESSAGE_FLAG['BOOK'], 'eof': eof_received}
+            self.data_saver.save_message_to_json(message)
         return eof_received
     
     def close(self):
@@ -77,7 +80,8 @@ class ReviewPublisher():
         full_message = json.dumps(rows)
         self.connection.send_message('', routing_key, full_message)
         if rows:
-            self.data_saver.save_message_to_json(client_id, rows[-1])
+            message = {'client_id': str(client_id), 'message_id': message_id, 'source': MESSAGE_FLAG['REVIEW'], 'eof': eof_received}
+            self.data_saver.save_message_to_json(message)
         return eof_received
     
     def close(self):

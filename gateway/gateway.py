@@ -3,7 +3,7 @@ import logging
 from multiprocessing import Process
 from socket import SOCK_STREAM, socket, AF_INET
 from pika.exchange_type import ExchangeType
-from gateway.data_storage import DataSaver
+from data_storage import DataSaver
 from lib.broker import MessageBroker
 from lib.gateway import BookPublisher, ResultReceiver, ReviewPublisher, MAX_KEY_LENGTH
 from lib.transfer.transfer_protocol import MESSAGE_FLAG, MessageTransferProtocol, RouterProtocol
@@ -17,6 +17,7 @@ class Gateway:
         self.port = config['port']
         self.router = RouterProtocol()
         self.data_saver = DataSaver(config['records_path'])
+        logging.warning(f'Gateway initialized with save path {config["records_path"]}')
         self.conn = None
 
     def start(self):
@@ -47,12 +48,13 @@ class Gateway:
                 eof_count += book_publisher.publish(client_id, message_id, message, get_books_keys)
             elif flag == MESSAGE_FLAG['REVIEW']:
                 eof_count += review_publisher.publish(client_id, message_id, message, 'reviews_queue')
-
-            if not client_routed:
-                router.add_connection(protocol, get_uid_raw(message))
-                client_routed = True
             else:
                 logging.error(f'Unsupported message flag {repr(flag)}')
+
+            if not client_routed:
+                router.add_connection(protocol, client_id)
+                client_routed = True
+                
             if eof_count == 2:
                 break
 
