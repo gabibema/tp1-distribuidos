@@ -27,17 +27,17 @@ class Client:
 
         self.books_queue = Queue()
         self.reviews_queue = Queue()
-        self.books_sender = Process(target=self.__enqueue_file, args=(self.books_path, self.books_queue))
-        self.reviews_sender = Process(target=self.__enqueue_file, args=(self.reviews_path, self.reviews_queue))
+        self.books_sender = Process(target=self.__enqueue_file, args=(self.books_path, self.books_queue, MESSAGE_FLAG['BOOK']))
+        self.reviews_sender = Process(target=self.__enqueue_file, args=(self.reviews_path, self.reviews_queue, MESSAGE_FLAG['REVIEW']))
 
 
     def start(self):
-        self.books_sender.start()
-        self.reviews_sender.start()
-        
         self.conn = self.__try_connect('gateway', self.port)
         self.checkpoint = self.__request_checkpoint()
         logging.warning(f'Checkpoint received: {self.checkpoint}')
+        
+        self.books_sender.start()
+        self.reviews_sender.start()
         self.__send_from_queue(self.books_queue, self.reviews_queue)
         self.books_sender.join()
         self.reviews_sender.join()
@@ -65,13 +65,22 @@ class Client:
         else:
             raise SystemError('Invalid response from the server')    # not handled at the moment
 
-    def __enqueue_file(self, path, queue):
+    def __enqueue_file(self, path, queue, source):
         # Batch message format:
         # field1,field2,...
         # value1,value2,...
         # value1,value2,...
         # ...
+        source = str(source)
         message_id = 1
+        start_id = 1
+        if source in self.checkpoint:
+            start_id = self.checkpoint[source]["message_id"]
+            eof = self.checkpoint[source]["eof"]
+        if eof:
+            logging.warning(f'Skipping file {path} due to EOF')
+            return
+
         with open(path, READ_MODE) as file:
             headers = file.readline()
             batch = [headers]
@@ -79,9 +88,13 @@ class Client:
             for line in file:
                 batch.append(line)
                 if len(batch) - 1 >= self.batch_amount:
+                    message_id += 1
+                    if message_id < start_id:
+                        logging.warning(f'Skipping message {message_id}')
+                        batch = [headers]
+                        continue
                     batch[-1] = batch[-1].rstrip()
                     queue.put((message_id, ''.join(batch)))
-                    message_id += 1
                     batch = [headers]
 
             if len(batch) > 1:
