@@ -72,7 +72,6 @@ class Client:
         # value1,value2,...
         # ...
         source = str(source)
-        message_id = 1
         start_id = 1
         if source in self.checkpoint:
             start_id = self.checkpoint[source]["message_id"]
@@ -83,27 +82,31 @@ class Client:
 
         with open(path, READ_MODE) as file:
             headers = file.readline()
-            batch = [headers]
+            self.__queue_file_rows(file, queue, source, start_id, headers)
+            
 
-            for line in file:
-                batch.append(line)
-                if len(batch) - 1 >= self.batch_amount:
-                    message_id += 1
-                    if message_id < start_id:
-                        logging.warning(f'Skipping message {message_id}')
-                        batch = [headers]
-                        continue
-                    batch[-1] = batch[-1].rstrip()
-                    queue.put((message_id, ''.join(batch)))
+    def __queue_file_rows(self, file, queue, source, start_id, headers):
+        message_id = 1
+        batch = [headers]
+        for line in file:
+            batch.append(line)
+            if len(batch) - 1 >= self.batch_amount:
+                message_id += 1
+                if message_id < start_id:
+                    logging.warning(f'Skipping message {message_id}')
                     batch = [headers]
-
-            if len(batch) > 1:
+                    continue
                 batch[-1] = batch[-1].rstrip()
                 queue.put((message_id, ''.join(batch)))
+                batch = [headers]
 
-            batch = ['type', 'EOF']
-            queue.put((message_id + 1, '\n'.join(batch)))
+        if len(batch) > 1:
+            batch[-1] = batch[-1].rstrip()
+            queue.put((message_id, ''.join(batch)))
 
+        batch = ['type', 'EOF']
+        queue.put((message_id + 1, '\n'.join(batch)))
+    
     def __sending_completed(self, books_queue: Queue, reviews_queue: Queue):
         return books_queue.empty() and reviews_queue.empty() and not self.books_sender.is_alive() and not self.reviews_sender.is_alive()
 
