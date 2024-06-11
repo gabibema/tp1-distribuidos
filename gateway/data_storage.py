@@ -41,6 +41,8 @@ class DataSaver:
                     messages = ['{' + msg + '}' if not msg.startswith('{') else msg + '}' if not msg.endswith('}') else msg for msg in messages]
                     for msg in messages:
                         message = json.loads(msg)
+                        if 'client_id' not in message:
+                            continue
                         uid = message['client_id']
                         if uid not in self.shared_last_rows:
                             self.shared_last_rows[uid] = self.manager.dict()

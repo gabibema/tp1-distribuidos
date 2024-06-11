@@ -2,6 +2,7 @@ import json
 import logging
 from multiprocessing import Process
 from socket import SOCK_STREAM, socket, AF_INET
+from typing import Tuple
 from pika.exchange_type import ExchangeType
 from data_storage import DataSaver
 from lib.broker import MessageBroker
@@ -39,32 +40,53 @@ class Gateway:
         result_receiver = ResultReceiver(connection, self.result_queues, callback_result_client, protocol)
         book_publisher = BookPublisher(connection, 'books_exchange', ExchangeType.topic, self.data_saver)
         review_publisher = ReviewPublisher(connection, self.data_saver)
-
-        eof_count = 0
-        client_routed = False
-        while True:
-            flag, client_id, message_id, message = protocol.receive_message()
-            if not client_routed:
-                router.add_connection(protocol, client_id)
-                client_routed = True
-            if flag == MESSAGE_FLAG['BOOK']:
-                eof_count += book_publisher.publish(client_id, message_id, message, get_books_keys)
-            elif flag == MESSAGE_FLAG['REVIEW']:
-                eof_count += review_publisher.publish(client_id, message_id, message, 'reviews_queue')
-            elif flag == MESSAGE_FLAG['CHECKPOINT']:
-                client_checkpoint = self.data_saver.shared_last_rows.get(str(client_id), {})
-                protocol.send_message(MESSAGE_FLAG['CHECKPOINT'], client_id, message_id, json.dumps(dict(client_checkpoint)))
-            else:
-                logging.error(f'Unsupported message flag {repr(flag)}')
-            if eof_count == 2:
-                break
-
+        self.__main_loop_client(protocol, router, book_publisher, review_publisher)
         normal_dict = {k: dict(v) for k, v in self.data_saver.shared_last_rows.items()}
         logging.warning(f'Final dict is: {normal_dict}')
 
         result_receiver.start()
 
+    def __get_checkpoint(self, client_id) -> Tuple[int, dict]:
+        client_checkpoint = self.data_saver.shared_last_rows.get(str(client_id), {})
+        eof_count = 0
+        if MESSAGE_FLAG['BOOK'] in client_checkpoint and client_checkpoint[MESSAGE_FLAG['BOOK']].get('eof'):
+            eof_count += 1
+        if MESSAGE_FLAG['REVIEW'] in client_checkpoint and client_checkpoint[MESSAGE_FLAG['REVIEW']].get('eof'):
+            eof_count += 1
+            
+        return eof_count, dict(client_checkpoint)
 
+    def __main_loop_client(self, protocol, router, book_publisher, review_publisher):
+        flag, client_id, message_id, message = protocol.receive_message()
+        eof_count, client_routed = self.__get_checkpoint(client_id)
+        
+        while True:
+            client_routed = self.__ensure_client_routed(router, protocol, client_id, client_routed)
+            eof_count += self.__handle_message(flag, client_id, message_id, message, book_publisher, review_publisher, protocol)
+            if eof_count == 2:
+                break
+            flag, client_id, message_id, message = protocol.receive_message()
+
+    def __ensure_client_routed(self, router, protocol, client_id, client_routed):
+        if not client_routed:
+            logging.warning(f'Adding connection for client {client_id}')
+            router.add_connection(protocol, client_id)
+            client_routed = True
+        return client_routed
+
+    def __handle_message(self, flag, client_id, message_id, message, book_publisher, review_publisher, protocol):
+        if flag == MESSAGE_FLAG['BOOK']:
+            return book_publisher.publish(client_id, message_id, message, get_books_keys)
+        elif flag == MESSAGE_FLAG['REVIEW']:
+            return review_publisher.publish(client_id, message_id, message, 'reviews_queue')
+        elif flag == MESSAGE_FLAG['CHECKPOINT']:
+            _, client_checkpoint = self.__get_checkpoint(client_id)
+            protocol.send_message(MESSAGE_FLAG['CHECKPOINT'], client_id, message_id, json.dumps(client_checkpoint))
+            return 0
+        else:
+            logging.error(f'Unsupported message flag {repr(flag)}')
+            return 0
+            
     def __wait_workers(self):
         connection = MessageBroker("rabbitmq")
         book_publisher = BookPublisher(connection, 'books_exchange', ExchangeType.topic)

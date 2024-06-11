@@ -73,6 +73,8 @@ class Client:
         # ...
         source = str(source)
         start_id = 1
+        eof = None
+        
         if source in self.checkpoint:
             start_id = self.checkpoint[source]["message_id"]
             eof = self.checkpoint[source]["eof"]
