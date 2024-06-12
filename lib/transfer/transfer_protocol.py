@@ -72,4 +72,4 @@ class MessageTransferProtocol(ByteTransferProtocol):
         """
         payload = super().receive_bytes()
         flag, client_id, message_id, message = payload[0], payload[1:17], payload[17:21], payload[21:]
-        return flag, uuid.UUID(bytes=client_id), struct.unpack('!L', message_id), message.decode('utf-8')
+        return flag, uuid.UUID(bytes=client_id), struct.unpack('!L', message_id)[0], message.decode('utf-8')

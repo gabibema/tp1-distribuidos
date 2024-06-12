@@ -38,11 +38,11 @@ class Gateway:
 
         eof_count = 0
         while True:
-            flag, client_id, message_id, message = protocol.receive_message()
+            flag, client_id, message_id, message_csv = protocol.receive_message()
             if flag == MESSAGE_FLAG['BOOK']:
-                eof_count += book_publisher.publish(client_id, message_id, message, get_books_keys)
+                eof_count += book_publisher.publish(client_id, message_id, message_csv, get_books_keys)
             elif flag == MESSAGE_FLAG['REVIEW']:
-                eof_count += review_publisher.publish(client_id, message_id, message, 'reviews_queue')
+                eof_count += review_publisher.publish(client_id, message_id, message_csv, 'reviews_queue')
             else:
                 logging.error(f'Unsupported message flag {repr(flag)}')
             if eof_count == 2:
@@ -58,8 +58,10 @@ class Gateway:
         review_publisher = ReviewPublisher(connection)
         result_receiver = ResultReceiver(connection, self.result_queues, callback_result, self.result_queues.copy())
 
-        book_publisher.publish('', get_books_keys)
-        review_publisher.publish('', 'reviews_queue')
+        client_id = 'READINESS_PROBE'
+        message_id = 0
+        book_publisher.publish(client_id, message_id, '', get_books_keys)
+        review_publisher.publish(client_id, message_id, '', 'reviews_queue')
         book_publisher.close()
         review_publisher.close()
         
