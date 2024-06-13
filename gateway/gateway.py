@@ -3,6 +3,7 @@ import logging
 from multiprocessing import Process
 from socket import SOCK_STREAM, socket, AF_INET
 from typing import Tuple
+from uuid import UUID
 from pika.exchange_type import ExchangeType
 from data_storage import DataSaver
 from lib.broker import MessageBroker
@@ -18,6 +19,7 @@ class Gateway:
         self.port = config['port']
         self.router = RouterProtocol()
         self.data_saver = DataSaver(config['records_path'])
+        self.data_saver_results = DataSaver(config['results_path'])
         logging.warning(f'Gateway initialized with save path {config["records_path"]}')
         self.conn = None
 
@@ -37,7 +39,7 @@ class Gateway:
         logging.warning(f'New client connection: {client}')
         protocol = MessageTransferProtocol(client)
         connection = MessageBroker("rabbitmq")
-        result_receiver = ResultReceiver(connection, self.result_queues, callback_result_client, protocol)
+        result_receiver = ResultReceiver(connection, self.result_queues, callback_result_client, protocol, self.data_saver_results)
         book_publisher = BookPublisher(connection, 'books_exchange', ExchangeType.topic, self.data_saver)
         review_publisher = ReviewPublisher(connection, self.data_saver)
         self.__main_loop_client(protocol, router, book_publisher, review_publisher)
@@ -102,16 +104,31 @@ class Gateway:
         result_receiver.close()
 
 
-def callback_result_client(self, ch, method, properties, body, queue_name, callback_arg: RouterProtocol):
+def callback_result_client(self, ch, method, properties, body, queue_name, callback_arg1: RouterProtocol, callback_arg2: DataSaver):
     body = json.loads(body)
     # PENDING: propagate message_id all they way back to the client.
-    message_id = 1
-    if body.get('type') == 'EOF':
-        callback_arg.send_message(MESSAGE_FLAG['EOF'], self.id, message_id, json.dumps({'file': queue_name}))
+    message_id = body.get('message_id', 1)
+    request_id = UUID(get_uid(body))
+    logging.warning(f'Received message of length {len(body)} from {queue_name}:\n {body}')
+    saved_body = {'request_id': str(request_id), 'message_id': message_id, 'source': queue_name, 'body': body}
+    callback_arg2.save_message_to_json(saved_body)
+
+    if isinstance(body, dict) and body.get('type') == 'EOF':
+        callback_arg1.send_message(MESSAGE_FLAG['EOF'], request_id, message_id, json.dumps({'file': queue_name}))
     else:
-        callback_arg.send_message(MESSAGE_FLAG['RESULT'], self.id, message_id, json.dumps({'file':queue_name, 'body':body}))
+        callback_arg1.send_message(MESSAGE_FLAG['RESULT'],request_id,message_id, json.dumps({'file':queue_name, 'body':body}))
     
     self.connection.acknowledge_message(method.delivery_tag)
+
+
+
+
+"""
+Para books:
+2024-06-13 19:15:43 gateway-1                        |  {'request_id': 'f412e42c-8f80-4d1c-882f-fac6a88d8465', 'authors': ["'John Ruskin'", "'Oscar Wilde'", "'Bertrand Russell'", "'Charles Kingsley'", "'Nathaniel Hawthorne'", "'Edgar Allan Poe'", "'Charles Dickens'", "'Edgar Rice Burroughs'", "'Erle Stanley Gardner'", "'Thomas Hardy'", "'William Shakespeare'", "'Franklin W. Dixon'", "'Arthur Conan Doyle'", "'Graham Greene'", "'Sigmund Freud'", "'Henry James'", "'John Bunyan'", "'Zane Grey'", "'Dante Alighieri'", "'Henry David Thoreau'", "'Henry Adams'", "'Joseph Conrad'", "'Agatha Christie'", "'Thomas Carlyle'", "'Henry Wadsworth Longfellow'", "'Voltaire'", "'Francis Parkman'", "'Rudyard Kipling'", "'Jack London'", "'Daniel Defoe'", "'Bernard Shaw'", "'Walter Scott'", "'William Dean Howells'", "'Robert Louis Stevenson'", "'Washington Irving'", "'James Fenimore Cooper'", "'Jules Verne'", "'Anthony Trollope'", "'Ellery Queen'", "'Jane Austen'", "'Alexandre Dumas'", "'Ernest Hemingway'", "'Mark Twain'", "'William Makepeace Thackeray'", "'Charles Darwin'", "'Charles Haddon Spurgeon'", "'Louisa May Alcott'", "'Ralph Waldo Emerson'", "'Henrik Ibsen'", "'Herbert George Wells'", "'Andrew Murray'", "'Miguel de Cervantes Saavedra'", "'Thomas Jefferson'", "'Lewis Carroll'", "'Gilbert Keith Chesterton'", "'Mary Roberts Rinehart'", "'Plato'", "'Lafcadio Hearn'", "'Karl Marx'", "'Emanuel Swedenborg'", "'Herman Melville'", "'John Milton'", "'Niccolò Machiavelli'", "'Edward Gibbon'"]}
+2024-06-13 19:15:43 gateway-1                        |  {'request_id': 'f412e42c-8f80-4d1c-882f-fac6a88d8465', 'message_id': 55, 'type': 'EOF'}
+
+"""
 
 
 def callback_result(ch, method, properties, body, queue_name, callback_arg):

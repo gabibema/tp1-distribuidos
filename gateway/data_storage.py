@@ -12,7 +12,7 @@ class DataSaver:
         self.__load_from_file()
 
     def save_message_to_json(self, message):
-        uid = message['client_id']
+        uid = message['request_id']
 
         if uid not in self.shared_last_rows:
             logging.warning(f'Creating new entry for {uid}')
@@ -35,9 +35,7 @@ class DataSaver:
             try:
                 with open(self.path, 'r') as f:
                     content = f.read()
-                    # Dividir el contenido en mensajes JSON individuales
                     messages = content.split('\n}\n{')
-                    # Añadir llaves de apertura y cierre adecuadas
                     messages = ['{' + msg + '}' if not msg.startswith('{') else msg + '}' if not msg.endswith('}') else msg for msg in messages]
                     for msg in messages:
                         message = json.loads(msg)

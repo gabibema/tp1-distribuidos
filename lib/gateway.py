@@ -44,7 +44,7 @@ class BookPublisher():
             logging.warning(f'Received message of length {len(message)}')
 
         if last_row:
-            message = {'client_id': str(client_id), 'message_id': message_id, 'source': MESSAGE_FLAG['BOOK'], 'eof': eof_received}
+            message = {'request_id': str(client_id), 'message_id': message_id, 'source': MESSAGE_FLAG['BOOK'], 'eof': eof_received}
             self.data_saver.save_message_to_json(message)
         return eof_received
     
@@ -80,7 +80,7 @@ class ReviewPublisher():
         full_message = json.dumps(rows)
         self.connection.send_message('', routing_key, full_message)
         if rows:
-            message = {'client_id': str(client_id), 'message_id': message_id, 'source': MESSAGE_FLAG['REVIEW'], 'eof': eof_received}
+            message = {'request_id': str(client_id), 'message_id': message_id, 'source': MESSAGE_FLAG['REVIEW'], 'eof': eof_received}
             self.data_saver.save_message_to_json(message)
         return eof_received
     
@@ -89,16 +89,16 @@ class ReviewPublisher():
         self.connection.connection.close()
 
 class ResultReceiver():
-    def __init__(self, connection, queues, callback, callback_arg):
+    def __init__(self, connection, queues, callback, callback_arg1, callback_arg2):
         self.connection = connection
         self.callback = callback
-        self.callback_arg = callback_arg
-        self.id = uuid.uuid4()
+        self.callback_arg1 = callback_arg1
+        self.callback_arg2 = callback_arg2
         for queue_name in queues:
             self.connection.create_queue(queue_name, True)
             self.connection.set_consumer(
                 queue_name,
-                lambda ch, method, properties, body, q=queue_name: callback(self, ch, method, properties, body, q, callback_arg)
+                lambda ch, method, properties, body, q=queue_name: callback(self, ch, method, properties, body, q, callback_arg1, callback_arg2)
             )
         self.connection.create_router('popular_90s_exchange', 'direct')
         self.connection.link_queue('popular_90s_books', 'popular_90s_exchange', 'popular_90s_queue')

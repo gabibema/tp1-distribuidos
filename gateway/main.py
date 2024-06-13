@@ -12,7 +12,8 @@ def get_config_params():
             'result_queues': config['DEFAULT'].get('RESULT_QUEUES').split(','),
             'port': int(os.getenv('PORT', default=config['DEFAULT'].get('PORT'))),
             'log_level': os.getenv('LOG_LEVEL', default=config['DEFAULT'].get('LOG_LEVEL')),
-            'records_path': os.getenv('RECORDS_PATH', default=config['DEFAULT'].get('RECORDS_PATH'))
+            'records_path': os.getenv('RECORDS_PATH', default=config['DEFAULT'].get('RECORDS_PATH')),
+            'results_path': os.getenv('RESULTS_PATH', default=config['DEFAULT'].get('RESULTS_PATH')),
         }
         print(config_params)
     except KeyError as e:
