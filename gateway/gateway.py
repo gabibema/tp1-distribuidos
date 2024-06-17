@@ -70,22 +70,22 @@ class Gateway:
 
 
 def callback_result_client(self, ch, method, properties, body, queue_name, callback_arg: MessageTransferProtocol):
-    body = json.loads(body)
+    message = json.loads(body)
+    logging.warning(f'Received message: {message}')
     # PENDING: propagate message_id all they way back to the client.
-    message_id = 1
-    if body.get('type') == 'EOF':
-        callback_arg.send_message(MESSAGE_FLAG['EOF'], self.id, message_id, json.dumps({'file': queue_name}))
+    if message.get('type') == 'EOF':
+        callback_arg.send_message(MESSAGE_FLAG['EOF'], self.id, message['message_id'], json.dumps({'file': queue_name}))
     else:
-        callback_arg.send_message(MESSAGE_FLAG['RESULT'], self.id, message_id, json.dumps({'file':queue_name, 'body':body}))
+        callback_arg.send_message(MESSAGE_FLAG['RESULT'], self.id, message['message_id'], json.dumps({'file':queue_name, 'body':message}))
     
     self.connection.acknowledge_message(method.delivery_tag)
     
 
 def callback_result(ch, method, properties, body, queue_name, callback_arg):
-    body = json.loads(body)
-    logging.warning(f'Received message of length {len(body)} from {queue_name}: {body}')
+    message = json.loads(body)
+    logging.warning(f'Received message of length {len(body)} from {queue_name}: {message}')
 
-    if body.get('type') == 'EOF':
+    if message.get('type') == 'EOF':
         callback_arg.remove(queue_name)
 
     if not callback_arg:

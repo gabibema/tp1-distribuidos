@@ -3,10 +3,9 @@ from lib.broker import MessageBroker
 from lib.workers import Map
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
 
-def sentiment(body):
-    review = json.loads(body)
+def sentiment(review):
     score = SentimentIntensityAnalyzer().polarity_scores(review['review/text'])['compound']
-    return json.dumps({'request_id': review['request_id'], 'message_id': review['message_id'], 'Title': review['Title'], 'score': score})
+    return {'Title': review['Title'], 'score': score}
 
 def main():
     # Pending: move variables to env.

@@ -70,6 +70,8 @@ class ParallelWorker(Worker):
                 self.end(ch, method, properties, body)
             else:
                 self.connection.send_message('', self.connection.next_peer, body)
+        else:
+            logging.error(f"Unhandled message with unknown 'type': {json.dumps(message)}")
         self.connection.acknowledge_message(method.delivery_tag)
 
     def end(self, ch, method, properties, body):
@@ -110,13 +112,9 @@ class Map(ParallelWorker):
             message = {'request_id': batch['request_id'], 'message_id': batch['message_id'], 'type': 'EOF', 'items': batch['items'], 'intended_recipient': self.connection.id}
             self.connection.send_message('', self.connection.next_peer, json.dumps(message))
         else:
-            message = {'request_id': batch['request_id'], 'message_id': batch['message_id']}
-            mapped_messages = []
-            for item in batch['items']:
-                item.update(message)
-                mapped_messages.append(json.loads(self.map_fn(json.dumps(item))))
-            batch['items'] = mapped_messages
-            self.connection.send_message(self.dst_exchange, self.routing_key, json.dumps(batch))
+            mapped_messages = [self.map_fn(item) for item in batch['items']]
+            message = {'request_id': batch['request_id'], 'message_id': batch['message_id'], 'items': mapped_messages}
+            self.connection.send_message(self.dst_exchange, self.routing_key, json.dumps(message))
         self.connection.acknowledge_message(method.delivery_tag)
 
 
@@ -176,11 +174,15 @@ class Aggregate(Worker):
     def end(self, ch, method, properties, body):
         eof_message = json.loads(body)
         logging.warning(f'{self.dst_exchange=}, {self.routing_key=}')
-        msg = self.result_fn(eof_message, self.accumulator)
-        msg = json.loads(msg)
-        msg['message_id'] = self.message_id
-        self.message_id += 1
-        self.connection.send_message(self.dst_exchange, self.routing_key, json.dumps(msg))
+        result = self.result_fn(eof_message, self.accumulator)
+        messages = json.loads(result)
+        if type(messages) != list:
+            logging.error('Result is not a list')
+            messages = [messages]
+        for message in messages:
+            message['message_id'] = self.message_id
+            self.message_id += 1
+            self.connection.send_message(self.dst_exchange, self.routing_key, json.dumps(message))
         self.connection.send_message(self.dst_exchange, self.routing_key, json.dumps(eof_message))
 
 

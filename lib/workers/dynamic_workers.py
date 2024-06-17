@@ -60,7 +60,7 @@ class DynamicRouter(DynamicWorker):
         if message['request_id'] not in self.ongoing_requests:
             self.create_queues(message['request_id'])
         if message['items'] and message['items'][0].get('type') == 'EOF':
-            message = {'request_id': message['request_id'], 'message_id': message['message_id'], 'items': message['items'], 'intended_recipient': self.connection.id}
+            message = {'request_id': message['request_id'], 'message_id': message['message_id'], 'items': message['items'], 'type': 'EOF', 'intended_recipient': self.connection.id}
             self.connection.send_message('', self.connection.next_peer, json.dumps(message))
         else:
             self.inner_callback(ch, method, properties, message)
@@ -102,11 +102,9 @@ class DynamicAggregate(DynamicWorker):
         'Callback given to a RabbitMQ queue to invoke for each message in the queue'
         if msg['items'] and msg['items'][0].get('type') == 'EOF':
             msg['type'] = msg['items'][0]['type']
-            del msg['items']
             self.end(msg)
         else:
-            for item in msg['items']:
-                self.aggregate_fn(item, self.accumulator)
+            self.aggregate_fn(msg, self.accumulator)
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
     def end(self, eof_message):
@@ -149,6 +147,7 @@ class DynamicFilter(Worker):
 
     def client_EOF(self, body):
         msg = json.loads(body)
+        msg['type'] = 'EOF'
         self.state = self.update_state(self.state, msg)
         tmp_queue = f"{self.tmp_queues_prefix}_{msg['request_id']}_queue"
         self.connection.channel.queue_delete(queue=tmp_queue)
@@ -157,14 +156,15 @@ class DynamicFilter(Worker):
         'Callback used to filter messages in a queue'
         batch = json.loads(body)
         if batch['items'] and batch['items'][0].get('type') == 'EOF':
-            self.connection.send_message(self.dst_exchange, self.routing_key, body)
             self.client_EOF(body)
-        filtered_messages = []
-        for item in batch['items']:
-            message = {'request_id': batch['request_id'], 'message_id': batch['message_id']}
-            message.update(item)
-            if self.filter_condition(self.state, message):
-                filtered_messages.append(item)
-        message['items'] = filtered_messages
-        self.connection.send_message(self.dst_exchange, self.routing_key, json.dumps(message))
+            self.connection.send_message(self.dst_exchange, self.routing_key, body)
+        else:
+            filtered_messages = []
+            for item in batch['items']:
+                message = {'request_id': batch['request_id'], 'message_id': batch['message_id']}
+                message.update(item)
+                if self.filter_condition(self.state, message):
+                    filtered_messages.append(item)
+            message['items'] = filtered_messages
+            self.connection.send_message(self.dst_exchange, self.routing_key, json.dumps(message))
         ch.basic_ack(delivery_tag=method.delivery_tag)
