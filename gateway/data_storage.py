@@ -98,4 +98,4 @@ class DataSaver:
 
     def get(self, uid):
         uid = str(uid)
-        return self.shared_rows.get(uid, None)
+        return self.shared_rows.get(uid, {})

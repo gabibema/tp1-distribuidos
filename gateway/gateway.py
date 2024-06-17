@@ -87,17 +87,12 @@ class Gateway:
     def __main_loop_client(self, protocol, router, book_publisher, review_publisher):
         flag, client_id, message_id, message = protocol.receive_message()
         eof_count, _ = self.__get_checkpoint(client_id)
-        self.__ensure_client_routed(router, protocol, client_id)
+        self.router.add_connection(protocol, client_id)
         eof_count += self.__handle_message(flag, client_id, message_id, message, book_publisher, review_publisher, protocol)
 
         while eof_count < 2:
             flag, client_id, message_id, message = protocol.receive_message()
             eof_count += self.__handle_message(flag, client_id, message_id, message, book_publisher, review_publisher, protocol)
-
-    def __ensure_client_routed(self, router, protocol, client_id):
-        if not router.is_client_routed(client_id):
-            logging.warning(f'Adding connection for client {client_id}')
-            router.add_connection(protocol, client_id)
 
 
     def __handle_message(self, flag, client_id, message_id, message, book_publisher, review_publisher, protocol):
@@ -131,30 +126,32 @@ class Gateway:
 def callback_result_client(self, ch, method, properties, body, queue_name, callback_arg1: RouterProtocol, callback_arg2: DataSaver, eof_count: int):
     body = json.loads(body)
     # PENDING: propagate message_id all they way back to the client.
-    message_id = body.get('message_id', 1)
+    message_id = body.get('message_id', 1) if isinstance(body, dict) else 1
     request_id = UUID(get_uid(body))
     logging.warning(f'Received message of length {len(body)} from {queue_name}:\n {body}')
     saved_body = {'request_id': str(request_id), 'message_id': message_id, 'source': queue_name, 'body': body}
     callback_arg2.save_message_to_json(saved_body)
 
-    if isinstance(body, dict) and body.get('type') == 'EOF':
-        callback_arg1.send_message(MESSAGE_FLAG['EOF'], request_id, message_id, json.dumps({'file': queue_name}))
-        eof_count += 1
-        logging.warning(f'EOF received from {queue_name}. Total EOFs: {eof_count}')
-    else:
-        callback_arg1.send_message(MESSAGE_FLAG['RESULT'],request_id,message_id, json.dumps({'file':queue_name, 'body':body}))
-    
+    try: 
+        if isinstance(body, dict) and body.get('type') == 'EOF':
+            callback_arg1.send_message(MESSAGE_FLAG['EOF'], request_id, message_id, json.dumps({'file': queue_name}))
+            self.eof_count += 1
+            logging.warning(f'EOF received from {queue_name}. Total EOFs: {self.eof_count}')
+        else:
+            callback_arg1.send_message(MESSAGE_FLAG['RESULT'],request_id,message_id, json.dumps({'file':queue_name, 'body':body}))
+    except Exception as _:
+        pass
+
     self.connection.acknowledge_message(method.delivery_tag)
     if eof_count == RESULTS_BACKLOG:
         ch.stop_consuming()
-
+        
 """
 Para books:
 2024-06-13 19:15:43 gateway-1                        |  {'request_id': 'f412e42c-8f80-4d1c-882f-fac6a88d8465', 'authors': ["'John Ruskin'", "'Oscar Wilde'", "'Bertrand Russell'", "'Charles Kingsley'", "'Nathaniel Hawthorne'", "'Edgar Allan Poe'", "'Charles Dickens'", "'Edgar Rice Burroughs'", "'Erle Stanley Gardner'", "'Thomas Hardy'", "'William Shakespeare'", "'Franklin W. Dixon'", "'Arthur Conan Doyle'", "'Graham Greene'", "'Sigmund Freud'", "'Henry James'", "'John Bunyan'", "'Zane Grey'", "'Dante Alighieri'", "'Henry David Thoreau'", "'Henry Adams'", "'Joseph Conrad'", "'Agatha Christie'", "'Thomas Carlyle'", "'Henry Wadsworth Longfellow'", "'Voltaire'", "'Francis Parkman'", "'Rudyard Kipling'", "'Jack London'", "'Daniel Defoe'", "'Bernard Shaw'", "'Walter Scott'", "'William Dean Howells'", "'Robert Louis Stevenson'", "'Washington Irving'", "'James Fenimore Cooper'", "'Jules Verne'", "'Anthony Trollope'", "'Ellery Queen'", "'Jane Austen'", "'Alexandre Dumas'", "'Ernest Hemingway'", "'Mark Twain'", "'William Makepeace Thackeray'", "'Charles Darwin'", "'Charles Haddon Spurgeon'", "'Louisa May Alcott'", "'Ralph Waldo Emerson'", "'Henrik Ibsen'", "'Herbert George Wells'", "'Andrew Murray'", "'Miguel de Cervantes Saavedra'", "'Thomas Jefferson'", "'Lewis Carroll'", "'Gilbert Keith Chesterton'", "'Mary Roberts Rinehart'", "'Plato'", "'Lafcadio Hearn'", "'Karl Marx'", "'Emanuel Swedenborg'", "'Herman Melville'", "'John Milton'", "'Niccolò Machiavelli'", "'Edward Gibbon'"]}
 2024-06-13 19:15:43 gateway-1                        |  {'request_id': 'f412e42c-8f80-4d1c-882f-fac6a88d8465', 'message_id': 55, 'type': 'EOF'}
-
+2024-06-17 19:21:25 gateway-1                        |  {'request_id': '551d0f23-17c9-48ef-b32a-3b1d129c8709', 'top10': [{'request_id': '551d0f23-17c9-48ef-b32a-3b1d129c8709', 'Title': 'Pride and Prejudice', 'count': 20371}, {'request_id': '551d0f23-17c9-48ef-b32a-3b1d129c8709', 'Title': "The Hitchhiker's Guide to the Galaxy", 'count': 4042}, {'request_id': '551d0f23-17c9-48ef-b32a-3b1d129c8709', 'Title': 'A Tree Grows in Brooklyn', 'count': 3904}, {'request_id': '551d0f23-17c9-48ef-b32a-3b1d129c8709', 'Title': 'Harry Potter and the Chamber of Secrets', 'count': 3137}, {'request_id': '551d0f23-17c9-48ef-b32a-3b1d129c8709', 'Title': 'Slaughterhouse-Five', 'count': 2975}, {'request_id': '551d0f23-17c9-48ef-b32a-3b1d129c8709', 'Title': 'Rich Dad, Poor Dad', 'count': 2734}, {'request_id': '551d0f23-17c9-48ef-b32a-3b1d129c8709', 'Title': 'Memoirs of a Geisha (Signed)', 'count': 2693}, {'request_id': '551d0f23-17c9-48ef-b32a-3b1d129c8709', 'Title': 'The Lord of the Rings (3 Volume Set)', 'count': 2478}, {'request_id': '551d0f23-17c9-48ef-b32a-3b1d129c8709', 'Title': 'Wuthering Heights (Signet classics)', 'count': 2160}, {'request_id': '551d0f23-17c9-48ef-b32a-3b1d129c8709', 'Title': 'Catch 22', 'count': 2084}]}
 """
-
 
 def callback_result(ch, method, properties, body, queue_name, callback_arg):
     body = json.loads(body)

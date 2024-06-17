@@ -60,3 +60,7 @@ docker-compose-down-all:
 docker-compose-logs:
 	docker compose -f docker-compose-dev.yaml logs -f
 .PHONY: docker-compose-logs
+
+write-clients:
+	@python3 docker-compose-writer.py $(N)
+.PHONY: write-clients
