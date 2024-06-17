@@ -44,13 +44,38 @@ class Gateway:
         book_publisher = BookPublisher(connection, 'books_exchange', ExchangeType.topic, self.data_saver)
         review_publisher = ReviewPublisher(connection, self.data_saver)
         self.__main_loop_client(protocol, router, book_publisher, review_publisher)
-        normal_dict = {k: dict(v) for k, v in self.data_saver.shared_last_rows.items()}
-        logging.warning(f'Final dict is: {normal_dict}')
+        
+        #normal_dict = {k: dict(v) for k, v in self.data_saver.shared_rows.items()}
+        #logging.warning(f'Final dict is: {normal_dict}')
+        
+        eof_count = self.__fetch_results_checkpoint(protocol)
+        result_receiver.start(eof_count)
 
-        result_receiver.start()
+    def __fetch_results_checkpoint(self, protocol):
+        flag, client_id, message_id, message = protocol.receive_message()
+        eof_count = 0
+        if flag != MESSAGE_FLAG['CHECKPOINT']:
+            logging.error(f'Expected checkpoint message, but received {flag}')        
+            return eof_count
+        
+        results = self.data_saver_results.get(client_id)
+        for result in results:
+            logging.warning(f'Processing result: {result}')
+            message = result['body']
+            if isinstance(message, dict) and message.get('type') == 'EOF':
+                protocol.send_message(MESSAGE_FLAG['EOF'], client_id, result['message_id'], 
+                                        json.dumps({'file': result['source']}))
+                eof_count += 1
+                logging.warning(f'EOF received from {result["source"]}. Total EOFs: {eof_count}')
+            else:
+                protocol.send_message(MESSAGE_FLAG['RESULT'],client_id,result['message_id'], 
+                                      json.dumps({'file':result['source'], 'body':message}))
+        
+        protocol.send_message(MESSAGE_FLAG['END_CHECKPOINT'], client_id, 1, '')
+        return eof_count
 
     def __get_checkpoint(self, client_id) -> Tuple[int, dict]:
-        client_checkpoint = self.data_saver.shared_last_rows.get(str(client_id), {})
+        client_checkpoint = self.data_saver.get(client_id)
         eof_count = 0
         if MESSAGE_FLAG['BOOK'] in client_checkpoint and client_checkpoint[MESSAGE_FLAG['BOOK']].get('eof'):
             eof_count += 1
@@ -122,10 +147,6 @@ def callback_result_client(self, ch, method, properties, body, queue_name, callb
     self.connection.acknowledge_message(method.delivery_tag)
     if eof_count == RESULTS_BACKLOG:
         ch.stop_consuming()
-
-
-
-
 
 """
 Para books:

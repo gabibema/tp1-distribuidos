@@ -11,7 +11,8 @@ MESSAGE_FLAG = {
     'RESULT': 3,
     'EOF': 4,
     'CHECKPOINT': 5,
-    'ERROR': 6
+    'END_CHECKPOINT': 6,
+    'ERROR': 7
 }
 
 BYTES_HEADER_SIZE = 4
@@ -87,3 +88,6 @@ class RouterProtocol:
     
     def send_message(self, flag: int, client_id: uuid.UUID, message_id: int, message: str):
         self.router[client_id].send_message(flag, client_id, message_id, message)
+    
+    def is_client_routed(self, client_id: uuid.UUID) -> bool:
+        return client_id in self.router

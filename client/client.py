@@ -128,20 +128,35 @@ class Client:
 
     def __save_results(self):
         protocol = MessageTransferProtocol(self.conn)
-        eof_count = 0
-        while True:
-            flag, _gateway_id, message_id, message = protocol.receive_message()
+        eof_count = self.__request_previous_results(protocol)
+        logging.warning(f'Previous results received with eofs count: {eof_count}')
+        while eof_count < RESULT_FILES_AMOUNT:
+            flag = self.__handle_result(protocol)
             if flag == MESSAGE_FLAG['EOF']:
-                logging.warning(f'EOF received')
                 eof_count += 1
-            elif flag == MESSAGE_FLAG['RESULT']:
-                body = loads(message)
-                logging.warning(f"Received message with ID '{message_id}' from Gateway'")
-                self.__save_in_file(body['file'], body['body'])
 
-            if eof_count == RESULT_FILES_AMOUNT:
-                break
+    def __request_previous_results(self, protocol):
+        protocol = MessageTransferProtocol(self.conn)
+        protocol.send_message(MESSAGE_FLAG['CHECKPOINT'], self.uuid, 1, '')
+        eof_count = 0
+        flag = None
 
+        while eof_count < RESULT_FILES_AMOUNT and flag != MESSAGE_FLAG['END_CHECKPOINT']:
+            flag = self.__handle_result(protocol)
+            if flag == MESSAGE_FLAG['EOF']:
+                eof_count += 1
+    
+        return eof_count
+
+
+    def __handle_result(self, protocol: MessageTransferProtocol):
+        flag, _gateway_id, message_id, message = protocol.receive_message()
+        if flag == MESSAGE_FLAG['RESULT']:
+            body = loads(message)
+            #logging.warning(f"Received message with ID '{message_id}' from Gateway'")
+            self.__save_in_file(body['file'], body['body'])
+        
+        return flag
 
     def __save_in_file(self, filename, body: dict):
         filepath = os.path.join(self.output_dir, f'{filename}.csv')

@@ -94,3 +94,8 @@ class DataSaver:
             # Attempt a different approach to handle the data if needed
             normal_dict = {k: v for k, v in self.shared_rows.items()}
             logging.warning(f'Loaded {len(self.shared_rows)} entries (without conversion)')
+
+
+    def get(self, uid):
+        uid = str(uid)
+        return self.shared_rows.get(uid, None)
