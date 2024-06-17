@@ -5,13 +5,14 @@ from socket import SOCK_STREAM, socket, AF_INET
 from typing import Tuple
 from uuid import UUID
 from pika.exchange_type import ExchangeType
-from data_storage import DataSaver
+from data_storage import ALL_ROWS, DataSaver
 from lib.broker import MessageBroker
 from lib.gateway import BookPublisher, ResultReceiver, ReviewPublisher, MAX_KEY_LENGTH
 from lib.transfer.transfer_protocol import MESSAGE_FLAG, MessageTransferProtocol, RouterProtocol
 from lib.workers.workers import wait_rabbitmq
 
 CLIENTS_BACKLOG = 5
+RESULTS_BACKLOG = 5
 
 class Gateway:
     def __init__(self, config):
@@ -19,7 +20,7 @@ class Gateway:
         self.port = config['port']
         self.router = RouterProtocol()
         self.data_saver = DataSaver(config['records_path'])
-        self.data_saver_results = DataSaver(config['results_path'])
+        self.data_saver_results = DataSaver(config['results_path'], mode=ALL_ROWS)
         logging.warning(f'Gateway initialized with save path {config["records_path"]}')
         self.conn = None
 
@@ -60,21 +61,19 @@ class Gateway:
 
     def __main_loop_client(self, protocol, router, book_publisher, review_publisher):
         flag, client_id, message_id, message = protocol.receive_message()
-        eof_count, client_routed = self.__get_checkpoint(client_id)
-        
-        while True:
-            client_routed = self.__ensure_client_routed(router, protocol, client_id, client_routed)
-            eof_count += self.__handle_message(flag, client_id, message_id, message, book_publisher, review_publisher, protocol)
-            if eof_count == 2:
-                break
-            flag, client_id, message_id, message = protocol.receive_message()
+        eof_count, _ = self.__get_checkpoint(client_id)
+        self.__ensure_client_routed(router, protocol, client_id)
+        eof_count += self.__handle_message(flag, client_id, message_id, message, book_publisher, review_publisher, protocol)
 
-    def __ensure_client_routed(self, router, protocol, client_id, client_routed):
-        if not client_routed:
+        while eof_count < 2:
+            flag, client_id, message_id, message = protocol.receive_message()
+            eof_count += self.__handle_message(flag, client_id, message_id, message, book_publisher, review_publisher, protocol)
+
+    def __ensure_client_routed(self, router, protocol, client_id):
+        if not router.is_client_routed(client_id):
             logging.warning(f'Adding connection for client {client_id}')
             router.add_connection(protocol, client_id)
-            client_routed = True
-        return client_routed
+
 
     def __handle_message(self, flag, client_id, message_id, message, book_publisher, review_publisher, protocol):
         if flag == MESSAGE_FLAG['BOOK']:
@@ -93,7 +92,7 @@ class Gateway:
         connection = MessageBroker("rabbitmq")
         book_publisher = BookPublisher(connection, 'books_exchange', ExchangeType.topic)
         review_publisher = ReviewPublisher(connection)
-        result_receiver = ResultReceiver(connection, self.result_queues, callback_result, self.result_queues.copy())
+        result_receiver = ResultReceiver(connection, self.result_queues, callback_result, self.result_queues.copy(), 0)
 
         book_publisher.publish('', get_books_keys)
         review_publisher.publish('', 'reviews_queue')
@@ -104,7 +103,7 @@ class Gateway:
         result_receiver.close()
 
 
-def callback_result_client(self, ch, method, properties, body, queue_name, callback_arg1: RouterProtocol, callback_arg2: DataSaver):
+def callback_result_client(self, ch, method, properties, body, queue_name, callback_arg1: RouterProtocol, callback_arg2: DataSaver, eof_count: int):
     body = json.loads(body)
     # PENDING: propagate message_id all they way back to the client.
     message_id = body.get('message_id', 1)
@@ -115,10 +114,15 @@ def callback_result_client(self, ch, method, properties, body, queue_name, callb
 
     if isinstance(body, dict) and body.get('type') == 'EOF':
         callback_arg1.send_message(MESSAGE_FLAG['EOF'], request_id, message_id, json.dumps({'file': queue_name}))
+        eof_count += 1
+        logging.warning(f'EOF received from {queue_name}. Total EOFs: {eof_count}')
     else:
         callback_arg1.send_message(MESSAGE_FLAG['RESULT'],request_id,message_id, json.dumps({'file':queue_name, 'body':body}))
     
     self.connection.acknowledge_message(method.delivery_tag)
+    if eof_count == RESULTS_BACKLOG:
+        ch.stop_consuming()
+
 
 
 

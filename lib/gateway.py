@@ -89,21 +89,24 @@ class ReviewPublisher():
         self.connection.connection.close()
 
 class ResultReceiver():
-    def __init__(self, connection, queues, callback, callback_arg1, callback_arg2):
+    def __init__(self, connection, queues, callback, callback_arg1, callback_arg2, eof_count=0):
         self.connection = connection
         self.callback = callback
         self.callback_arg1 = callback_arg1
         self.callback_arg2 = callback_arg2
+        self.eof_count = eof_count
         for queue_name in queues:
             self.connection.create_queue(queue_name, True)
             self.connection.set_consumer(
                 queue_name,
-                lambda ch, method, properties, body, q=queue_name: callback(self, ch, method, properties, body, q, callback_arg1, callback_arg2)
+                lambda ch, method, properties, body, q=queue_name: callback(self, ch, method, properties, body, q, callback_arg1, callback_arg2, self.eof_count)
             )
         self.connection.create_router('popular_90s_exchange', 'direct')
         self.connection.link_queue('popular_90s_books', 'popular_90s_exchange', 'popular_90s_queue')
     
-    def start(self):
+    def start(self, eof_count=0):
+        self.eof_count += eof_count
+        logging.warning(f'Starting result receiver with eof_count {self.eof_count}')
         self.connection.begin_consuming()
     
     def close(self):
