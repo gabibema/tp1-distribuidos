@@ -12,10 +12,10 @@ services:
     volumes:
       - ./config/client.ini:/app/config.ini
       - ./lib:/app/lib
-      - ./data:/app/data
+      - ./data/cca74f4b-bce5-4253-9248-fb9f8a17e2ce:/app/data
     environment:
-      - CLIENT_ID=551d0f23-17c9-48ef-b32a-3b1d129c8709
-      - OUTPUT_DIR=/app/data/551d0f23-17c9-48ef-b32a-3b1d129c8709
+      - CLIENT_ID=cca74f4b-bce5-4253-9248-fb9f8a17e2ce
+      - OUTPUT_DIR=/app/data/cca74f4b-bce5-4253-9248-fb9f8a17e2ce/results
     networks:
       - default
 
@@ -25,10 +25,10 @@ services:
     volumes:
       - ./config/client.ini:/app/config.ini
       - ./lib:/app/lib
-      - ./data:/app/data
+      - ./data/af70d96a-09b5-404a-b236-adb5587777bc:/app/data
     environment:
-      - CLIENT_ID=acb9430c-abb2-458a-ac5e-45034b84109d
-      - OUTPUT_DIR=/app/data/acb9430c-abb2-458a-ac5e-45034b84109d
+      - CLIENT_ID=af70d96a-09b5-404a-b236-adb5587777bc
+      - OUTPUT_DIR=/app/data/af70d96a-09b5-404a-b236-adb5587777bc/results
     networks:
       - default
 
@@ -38,10 +38,10 @@ services:
     volumes:
       - ./config/client.ini:/app/config.ini
       - ./lib:/app/lib
-      - ./data:/app/data
+      - ./data/fc5bd853-cc64-44f7-afa5-8c5662997825:/app/data
     environment:
-      - CLIENT_ID=e5cd508c-2eaa-45a9-9740-f2b9e5efd65a
-      - OUTPUT_DIR=/app/data/e5cd508c-2eaa-45a9-9740-f2b9e5efd65a
+      - CLIENT_ID=fc5bd853-cc64-44f7-afa5-8c5662997825
+      - OUTPUT_DIR=/app/data/fc5bd853-cc64-44f7-afa5-8c5662997825/results
     networks:
       - default
 
@@ -51,10 +51,10 @@ services:
   #   volumes:
   #     - ./config/client.ini:/app/config.ini
   #     - ./lib:/app/lib
-  #     - ./data:/app/data
+  #     - ./data/29c397ed-13eb-45bc-94ec-1a6582cb731a:/app/data
   #   environment:
-  #     - CLIENT_ID=dde22093-9125-47f8-bb3b-21cf5edf7a19
-  #     - OUTPUT_DIR=/app/data/dde22093-9125-47f8-bb3b-21cf5edf7a19
+  #     - CLIENT_ID=29c397ed-13eb-45bc-94ec-1a6582cb731a
+  #     - OUTPUT_DIR=/app/data/29c397ed-13eb-45bc-94ec-1a6582cb731a/results
   #   networks:
   #     - default
 
@@ -64,10 +64,10 @@ services:
   #   volumes:
   #     - ./config/client.ini:/app/config.ini
   #     - ./lib:/app/lib
-  #     - ./data:/app/data
+  #     - ./data/454f09a2-8142-498f-bdec-504c100e85cb:/app/data
   #   environment:
-  #     - CLIENT_ID=50544ee7-eeae-4d05-8658-39dd73e48c48
-  #     - OUTPUT_DIR=/app/data/50544ee7-eeae-4d05-8658-39dd73e48c48
+  #     - CLIENT_ID=454f09a2-8142-498f-bdec-504c100e85cb
+  #     - OUTPUT_DIR=/app/data/454f09a2-8142-498f-bdec-504c100e85cb/results
   #   networks:
   #     - default
 
@@ -77,10 +77,10 @@ services:
   #   volumes:
   #     - ./config/client.ini:/app/config.ini
   #     - ./lib:/app/lib
-  #     - ./data:/app/data
+  #     - ./data/4a220114-6917-43e6-a7c7-1b791f654ec9:/app/data
   #   environment:
-  #     - CLIENT_ID=2a97960c-e921-4109-a1a8-c01d83a7542c
-  #     - OUTPUT_DIR=/app/data/2a97960c-e921-4109-a1a8-c01d83a7542c
+  #     - CLIENT_ID=4a220114-6917-43e6-a7c7-1b791f654ec9
+  #     - OUTPUT_DIR=/app/data/4a220114-6917-43e6-a7c7-1b791f654ec9/results
   #   networks:
   #     - default
 
@@ -90,10 +90,10 @@ services:
   #   volumes:
   #     - ./config/client.ini:/app/config.ini
   #     - ./lib:/app/lib
-  #     - ./data:/app/data
+  #     - ./data/39013c3c-5848-4f74-8300-af0ce7bf8c2b:/app/data
   #   environment:
-  #     - CLIENT_ID=0b79f0a9-df6e-48cc-8c8a-3dcbe98184dd
-  #     - OUTPUT_DIR=/app/data/0b79f0a9-df6e-48cc-8c8a-3dcbe98184dd
+  #     - CLIENT_ID=39013c3c-5848-4f74-8300-af0ce7bf8c2b
+  #     - OUTPUT_DIR=/app/data/39013c3c-5848-4f74-8300-af0ce7bf8c2b/results
   #   networks:
   #     - default
 
@@ -103,10 +103,10 @@ services:
   #   volumes:
   #     - ./config/client.ini:/app/config.ini
   #     - ./lib:/app/lib
-  #     - ./data:/app/data
+  #     - ./data/fa9561cd-115e-4fb6-8701-621276d27427:/app/data
   #   environment:
-  #     - CLIENT_ID=45df3d0d-a456-467a-8fe6-d14d0e9abb71
-  #     - OUTPUT_DIR=/app/data/45df3d0d-a456-467a-8fe6-d14d0e9abb71
+  #     - CLIENT_ID=fa9561cd-115e-4fb6-8701-621276d27427
+  #     - OUTPUT_DIR=/app/data/fa9561cd-115e-4fb6-8701-621276d27427/results
   #   networks:
   #     - default
 
@@ -116,10 +116,10 @@ services:
   #   volumes:
   #     - ./config/client.ini:/app/config.ini
   #     - ./lib:/app/lib
-  #     - ./data:/app/data
+  #     - ./data/2bb5276c-f1be-4455-baa5-06023a44ed5e:/app/data
   #   environment:
-  #     - CLIENT_ID=08b3e96e-5311-42e8-9946-a9a8ba5e56f4
-  #     - OUTPUT_DIR=/app/data/08b3e96e-5311-42e8-9946-a9a8ba5e56f4
+  #     - CLIENT_ID=2bb5276c-f1be-4455-baa5-06023a44ed5e
+  #     - OUTPUT_DIR=/app/data/2bb5276c-f1be-4455-baa5-06023a44ed5e/results
   #   networks:
   #     - default
 
@@ -129,9 +129,9 @@ services:
   #   volumes:
   #     - ./config/client.ini:/app/config.ini
   #     - ./lib:/app/lib
-  #     - ./data:/app/data
+  #     - ./data/c8887490-ef31-459d-9e18-cf68fdb19edd:/app/data
   #   environment:
-  #     - CLIENT_ID=4f8ec1ca-a194-4ec9-9ea3-319e7ac419c6
-  #     - OUTPUT_DIR=/app/data/4f8ec1ca-a194-4ec9-9ea3-319e7ac419c6
+  #     - CLIENT_ID=c8887490-ef31-459d-9e18-cf68fdb19edd
+  #     - OUTPUT_DIR=/app/data/c8887490-ef31-459d-9e18-cf68fdb19edd/results
   #   networks:
   #     - default

@@ -63,4 +63,5 @@ docker-compose-logs:
 
 write-clients:
 	@python3 docker-compose-writer.py $(N)
+	@python3 batch-creator-clients.py
 .PHONY: write-clients
