@@ -169,17 +169,15 @@ class Client:
             body = body['top10']
 
         if isinstance(body, dict):
-            if 'request_id' in body:
-                del body['request_id']
-            body = [body]
-        else:
-            for row in body:
-                if 'request_id' in row:
-                    row.pop('request_id')
+            body = body['items'] if 'items' in body else [body]
+        for row in body:
+            row.pop('request_id', None)
+            row.pop('message_id', None)
 
-        with open(filepath, 'a+', newline='') as file:
-            writer = DictWriter(file, fieldnames=body[0].keys())
-            if not file_exists or file.tell() == 0:
-                writer.writeheader()
+        if body:
+            with open(filepath, 'a+', newline='') as file:
+                writer = DictWriter(file, fieldnames=body[0].keys())
+                if not file_exists or file.tell() == 0:
+                    writer.writeheader()
 
-            writer.writerows(body)
+                writer.writerows(body)

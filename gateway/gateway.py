@@ -114,8 +114,10 @@ class Gateway:
         review_publisher = ReviewPublisher(connection)
         result_receiver = ResultReceiver(connection, self.result_queues, callback_result, self.result_queues.copy(), 0)
 
-        book_publisher.publish('', get_books_keys)
-        review_publisher.publish('', 'reviews_queue')
+        client_id = 'READINESS_PROBE'
+        message_id = 0
+        book_publisher.publish(client_id, message_id, '', get_books_keys)
+        review_publisher.publish(client_id, message_id, '', 'reviews_queue')
         book_publisher.close()
         review_publisher.close()
         
@@ -154,10 +156,10 @@ Para books:
 """
 
 def callback_result(ch, method, properties, body, queue_name, callback_arg):
-    body = json.loads(body)
-    logging.warning(f'Received message of length {len(body)} from {queue_name}: {body}')
+    message = json.loads(body)
+    logging.warning(f'Received message of length {len(body)} from {queue_name}: {message}')
 
-    if body.get('type') == 'EOF':
+    if message.get('type') == 'EOF':
         callback_arg.remove(queue_name)
 
     if not callback_arg:

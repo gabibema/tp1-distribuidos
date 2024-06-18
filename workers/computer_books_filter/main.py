@@ -8,8 +8,11 @@ def title_filter(body):
     date = msg['publishedDate']
     if not date:
         return False
-    year = int(date.split('-', maxsplit=1)[0])
-    return 2000 <= year <= 2023 and 'Computers' in msg['categories'] and 'distributed' in msg['Title']
+    try:
+        year = int(date.split('-', maxsplit=1)[0])
+        return 2000 <= year <= 2023 and 'Computers' in msg['categories'] and 'distributed' in msg['Title']
+    except:
+        return False
 
 def main():
     # Pending: move variables to env.

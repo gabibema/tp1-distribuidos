@@ -70,6 +70,8 @@ class ParallelWorker(Worker):
                 self.end(ch, method, properties, body)
             else:
                 self.connection.send_message('', self.connection.next_peer, body)
+        else:
+            logging.error(f"Unhandled message with unknown 'type': {json.dumps(message)}")
         self.connection.acknowledge_message(method.delivery_tag)
 
     def end(self, ch, method, properties, body):
@@ -86,13 +88,14 @@ class Filter(ParallelWorker):
 
     def callback(self, ch, method, properties, body):
         'Callback given to a queue to invoke for each message in the queue'
-        message = json.loads(body)
-        if message.get('type') == 'EOF':
-            logging.warning(message)
-            message['intended_recipient'] = self.connection.id
+        batch = json.loads(body)
+        if batch['items'] and batch['items'][0].get('type') == 'EOF':
+            logging.warning(batch)
+            message = {'request_id': batch['request_id'], 'message_id': batch['message_id'], 'type': 'EOF', 'items': batch['items'], 'intended_recipient': self.connection.id}
             self.connection.send_message('', self.connection.next_peer, json.dumps(message))
-        elif self.filter_condition(body):
-            self.connection.send_message(self.dst_exchange, self.routing_key, body)
+        else:
+            batch['items'] = [msg for msg in batch['items'] if self.filter_condition(json.dumps(msg))]
+            self.connection.send_message(self.dst_exchange, self.routing_key, json.dumps(batch))
         self.connection.acknowledge_message(method.delivery_tag)
 
 
@@ -103,14 +106,17 @@ class Map(ParallelWorker):
 
     def callback(self, ch, method, properties, body):
         'Callback given to a queue to invoke for each message in the queue'
-        message = json.loads(body)
-        if message.get('type') == 'EOF':
-            logging.warning(message)
-            message['intended_recipient'] = self.connection.id
+        batch = json.loads(body)
+        if batch['items'] and batch['items'][0].get('type') == 'EOF':
+            logging.warning(batch)
+            message = {'request_id': batch['request_id'], 'message_id': batch['message_id'], 'type': 'EOF', 'items': batch['items'], 'intended_recipient': self.connection.id}
             self.connection.send_message('', self.connection.next_peer, json.dumps(message))
         else:
-            self.connection.send_message(self.dst_exchange, self.routing_key, self.map_fn(body))
+            mapped_messages = [self.map_fn(item) for item in batch['items']]
+            message = {'request_id': batch['request_id'], 'message_id': batch['message_id'], 'items': mapped_messages}
+            self.connection.send_message(self.dst_exchange, self.routing_key, json.dumps(message))
         self.connection.acknowledge_message(method.delivery_tag)
+
 
 class Router(ParallelWorker):
     def __init__(self, routing_fn, *args, **kwargs):
@@ -119,15 +125,20 @@ class Router(ParallelWorker):
 
     def callback(self, ch, method, properties, body):
         'Callback given to a queue to invoke for each message in the queue'
-        message = json.loads(body)
-        if message.get('type') == 'EOF':
-            logging.warning(message)
-            message['intended_recipient'] = self.connection.id
+        batch = json.loads(body)
+        if batch['items'] and batch['items'][0].get('type') == 'EOF':
+            logging.warning(batch)
+            message = {'request_id': batch['request_id'], 'message_id': batch['message_id'], 'type': 'EOF', 'items': batch['items'], 'intended_recipient': self.connection.id}
             self.connection.send_message('', self.connection.next_peer, json.dumps(message))
         else:
-            routing_keys = self.routing_fn(body)
-            for routing_key in routing_keys:
-                self.connection.send_message(self.dst_exchange, routing_key, body)
+            messages_per_target = {}
+            for msg in batch['items']:
+                for routing_key in self.routing_fn(json.dumps(msg)):
+                    messages_per_target[routing_key] = messages_per_target.get(routing_key, [])
+                    messages_per_target[routing_key].append(msg)
+            for routing_key, messages in messages_per_target.items():
+                batch['items'] = messages
+                self.connection.send_message(self.dst_exchange, routing_key, json.dumps(batch))
         self.connection.acknowledge_message(method.delivery_tag)
 
     def end(self, ch, method, properties, body):
@@ -144,26 +155,34 @@ class Aggregate(Worker):
         self.aggregate_fn = aggregate_fn
         self.result_fn = result_fn
         self.accumulator = accumulator
+        self.message_id = 1
         super().new(*args, **kwargs)
 
     def callback(self, ch, method, properties, body):
         'Callback given to a queue to invoke for each message in the queue'
-        messages = json.loads(body)
-        if type(messages) != list:
-            messages = [messages]
-        for msg in messages:
-            if msg.get('type') == 'EOF':
-                logging.warning(json.loads(body))
-                self.end(ch, method, properties, json.dumps(msg))
+        batch = json.loads(body)
+        for item in batch['items']:
+            message = {'request_id': batch['request_id'], 'message_id': batch['message_id']}
+            message.update(item)
+            if message.get('type') == 'EOF':
+                logging.warning(message)
+                self.end(ch, method, properties, body)
             else:
-                self.aggregate_fn(msg, self.accumulator)
+                self.aggregate_fn(message, self.accumulator)
         self.connection.acknowledge_message(method.delivery_tag)
 
     def end(self, ch, method, properties, body):
         eof_message = json.loads(body)
         logging.warning(f'{self.dst_exchange=}, {self.routing_key=}')
-        msg = self.result_fn(eof_message, self.accumulator)
-        self.connection.send_message(self.dst_exchange, self.routing_key, msg)
+        result = self.result_fn(eof_message, self.accumulator)
+        messages = json.loads(result)
+        if type(messages) != list:
+            logging.error('Result is not a list')
+            messages = [messages]
+        for message in messages:
+            message['message_id'] = self.message_id
+            self.message_id += 1
+            self.connection.send_message(self.dst_exchange, self.routing_key, json.dumps(message))
         self.connection.send_message(self.dst_exchange, self.routing_key, json.dumps(eof_message))
 
 

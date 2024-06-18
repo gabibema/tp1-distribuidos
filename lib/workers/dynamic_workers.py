@@ -25,13 +25,12 @@ class DynamicWorker(Worker):
         This is to ensure that the callback fn will always publish to an existing queue.
         """
         message = json.loads(body)
-        msg = message[-1] if isinstance(message, list) else message
-        if msg['request_id'] not in self.ongoing_requests:
-            self.create_queues(msg['request_id'])
+        if message['request_id'] not in self.ongoing_requests:
+            self.create_queues(message['request_id'])
         self.inner_callback(ch, method, properties, message)
-        if msg.get('type') == 'EOF':
+        if message['items'] and message['items'][0].get('type') == 'EOF':
             logging.warning(json.loads(body))
-            self.ongoing_requests.discard(msg['request_id'])
+            self.ongoing_requests.discard(message['request_id'])
             # DON'T delete queues yet! messages need to be consumed.
             # queues should be deleted by consumer after reading the EOF.
 
@@ -58,21 +57,27 @@ class DynamicRouter(DynamicWorker):
         This is to ensure that the callback fn will always publish to an existing queue.
         """
         message = json.loads(body)
-        msg = message[-1] if isinstance(message, list) else message
-        if msg['request_id'] not in self.ongoing_requests:
-            self.create_queues(msg['request_id'])
-        if msg.get('type') == 'EOF':
-            msg['intended_recipient'] = self.connection.id
-            self.connection.send_message('', self.connection.next_peer, json.dumps(msg))
+        if message['request_id'] not in self.ongoing_requests:
+            self.create_queues(message['request_id'])
+        if message['items'] and message['items'][0].get('type') == 'EOF':
+            message = {'request_id': message['request_id'], 'message_id': message['message_id'], 'items': message['items'], 'type': 'EOF', 'intended_recipient': self.connection.id}
+            self.connection.send_message('', self.connection.next_peer, json.dumps(message))
         else:
             self.inner_callback(ch, method, properties, message)
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
-    def inner_callback(self, ch, method, properties, messages):
+    def inner_callback(self, ch, method, properties, batch):
         'Callback given to a RabbitMQ queue to invoke for each message in the queue'
-        for msg in messages:
-            for routing_key in self.routing_fn(msg):
-                ch.basic_publish(exchange=self.dst_exchange, routing_key=routing_key, body=json.dumps(msg))
+        messages_per_target = {}
+        for msg in batch['items']:
+            message = {'request_id': batch['request_id'], 'message_id': batch['message_id']}
+            message.update(msg)
+            for routing_key in self.routing_fn(message):
+                messages_per_target[routing_key] = messages_per_target.get(routing_key, [])
+                messages_per_target[routing_key].append(msg)
+        for routing_key, messages in messages_per_target.items():
+            batch['items'] = messages
+            ch.basic_publish(exchange=self.dst_exchange, routing_key=routing_key, body=json.dumps(batch))
 
     def end(self, ch, method, properties, body):
         'Send EOF to next layer'
@@ -90,11 +95,13 @@ class DynamicAggregate(DynamicWorker):
         self.aggregate_fn = aggregate_fn
         self.result_fn = result_fn
         self.accumulator = accumulator
+        self.message_id = 1
         super().new(*args, **kwargs)
 
     def inner_callback(self, ch, method, properties, msg):
         'Callback given to a RabbitMQ queue to invoke for each message in the queue'
-        if msg.get('type') == 'EOF':
+        if msg['items'] and msg['items'][0].get('type') == 'EOF':
+            msg['type'] = msg['items'][0]['type']
             self.end(msg)
         else:
             self.aggregate_fn(msg, self.accumulator)
@@ -103,8 +110,12 @@ class DynamicAggregate(DynamicWorker):
     def end(self, eof_message):
         messages = self.result_fn(eof_message, self.accumulator)
         for msg in messages:
+            msg['message_id'] = self.message_id
+            self.message_id += 1
             routing_key = f"{self.routing_key}_{msg['request_id']}"
             self.connection.send_message(self.dst_exchange, routing_key, json.dumps(msg))
+        eof_message['message_id'] = self.message_id
+        self.message_id += 1
         routing_key = f"{self.routing_key}_{eof_message['request_id']}"
         self.connection.send_message(self.dst_exchange, routing_key, json.dumps(eof_message))
 
@@ -136,16 +147,24 @@ class DynamicFilter(Worker):
 
     def client_EOF(self, body):
         msg = json.loads(body)
+        msg['type'] = 'EOF'
         self.state = self.update_state(self.state, msg)
         tmp_queue = f"{self.tmp_queues_prefix}_{msg['request_id']}_queue"
         self.connection.channel.queue_delete(queue=tmp_queue)
 
     def filter_callback(self, ch, method, properties, body):
         'Callback used to filter messages in a queue'
-        msg = json.loads(body)
-        if msg.get('type') == 'EOF':
-            self.connection.send_message(self.dst_exchange, self.routing_key, json.dumps(msg))
+        batch = json.loads(body)
+        if batch['items'] and batch['items'][0].get('type') == 'EOF':
             self.client_EOF(body)
-        elif self.filter_condition(self.state, msg):
-            self.connection.send_message(self.dst_exchange, self.routing_key, json.dumps(msg))
+            self.connection.send_message(self.dst_exchange, self.routing_key, body)
+        else:
+            filtered_messages = []
+            for item in batch['items']:
+                message = {'request_id': batch['request_id'], 'message_id': batch['message_id']}
+                message.update(item)
+                if self.filter_condition(self.state, message):
+                    filtered_messages.append(item)
+            batch['items'] = filtered_messages
+            self.connection.send_message(self.dst_exchange, self.routing_key, json.dumps(batch))
         ch.basic_ack(delivery_tag=method.delivery_tag)

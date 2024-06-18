@@ -15,39 +15,27 @@ class BookPublisher():
         self.exchange = dst_exchange
         self.connection.create_router(dst_exchange, dst_exchange_type)
 
-    def publish(self, client_id, message_id, message, routing_key_fn):
+    def publish(self, client_id, message_id, message_csv, routing_key_fn):
         eof_received = False
-        last_row = None
-        reader = DictReader(StringIO(message))
-
+        reader = DictReader(StringIO(message_csv))
+        rows = []
         for row in reader:
-            last_row = row
-            row_filtered = {'request_id': str(client_id), 'message_id': message_id}
-            if 'type' in row:
-                eof_received |= 'EOF' in row['type']
-                row_filtered['type'] = row['type']
-            if 'Title' in row:
-                row_filtered['Title'] = row['Title']
-            if 'publishedDate' in row:
-                row_filtered['publishedDate'] = row['publishedDate']
-            if 'categories' in row:
-                row_filtered['categories'] = row['categories']
-            if 'authors' in row:
-                row_filtered['authors'] = row['authors']
-            
-            routing_key = routing_key_fn(row_filtered)
-            self.connection.send_message(self.exchange, routing_key, json.dumps(row_filtered))
-
-        if eof_received:
-            logging.warning(f'{client_id} EOF received')
-        else:
-            logging.warning(f'Received message of length {len(message)}')
-
-        if last_row:
-            message = {'request_id': str(client_id), 'message_id': message_id, 'source': MESSAGE_FLAG['BOOK'], 'eof': eof_received}
-            self.data_saver.save_message_to_json(message)
+            if row.get('type') == 'EOF':
+                logging.warning(f'{client_id} EOF received')
+                row = {'type': 'EOF'}
+                eof_received = True
+            else:
+                row = {'Title': row['Title'], 'publishedDate': row['publishedDate'], 'categories': row['categories'], 'authors': row['authors']}
+            routing_key = routing_key_fn(row)
+            rows.append(row)
+        
+        batch_message = {'request_id': str(client_id), 'message_id': message_id, 'items': rows}
+        self.connection.send_message(self.exchange, routing_key, json.dumps(batch_message))
+        
+        message = {'request_id': str(client_id), 'message_id': message_id, 'source': MESSAGE_FLAG['BOOK'], 'eof': eof_received}
+        self.data_saver.save_message_to_json(message)
         return eof_received
-    
+
     def close(self):
         self.connection.channel.close()
         self.connection.connection.close()
@@ -57,33 +45,25 @@ class ReviewPublisher():
         self.data_saver = data_saver
         self.connection = connection
 
-    def publish(self, client_id, message_id, message, routing_key):
+    def publish(self, client_id, message_id, message_csv, routing_key):
         eof_received = False
-        reader = DictReader(StringIO(message))
+        reader = DictReader(StringIO(message_csv))
         rows = []
         for row in reader:
-            current_row = {'request_id': str(client_id), 'message_id': message_id}
-            if 'Title' in row:
-                current_row['Title'] = row['Title']
-            if 'review/text' in row:
-                current_row['review/text'] = row['review/text']
-            if 'type' in row:
-                current_row['type'] = row['type']
-            if len(current_row) > 1:
-                rows.append(current_row)
-    
-        if len(rows) == 1 and rows[0].get('type') == 'EOF':
-            eof_received = True
-            logging.warning(f'{client_id} EOF received')
-        else:
-            logging.warning(f'Received message of length {len(message)}') 
-        full_message = json.dumps(rows)
-        self.connection.send_message('', routing_key, full_message)
-        if rows:
-            message = {'request_id': str(client_id), 'message_id': message_id, 'source': MESSAGE_FLAG['REVIEW'], 'eof': eof_received}
-            self.data_saver.save_message_to_json(message)
+            if row.get('type') == 'EOF':
+                logging.warning(f'{client_id} EOF received')
+                row = {'type': 'EOF'}
+                eof_received = True
+            else:
+                row = {'Title': row['Title'], 'review/text': row['review/text']}
+            rows.append(row)
+        batch_message = {'request_id': str(client_id), 'message_id': message_id, 'items': rows}
+        self.connection.send_message('', routing_key, json.dumps(batch_message))
+        
+        message = {'request_id': str(client_id), 'message_id': message_id, 'source': MESSAGE_FLAG['REVIEW'], 'eof': eof_received}
+        self.data_saver.save_message_to_json(message)
         return eof_received
-    
+
     def close(self):
         self.connection.channel.close()
         self.connection.connection.close()
