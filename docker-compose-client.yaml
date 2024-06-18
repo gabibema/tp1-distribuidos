@@ -15,7 +15,7 @@ services:
       - ./data/cca74f4b-bce5-4253-9248-fb9f8a17e2ce:/app/data
     environment:
       - CLIENT_ID=cca74f4b-bce5-4253-9248-fb9f8a17e2ce
-      - OUTPUT_DIR=/app/data/cca74f4b-bce5-4253-9248-fb9f8a17e2ce/results
+      - OUTPUT_DIR=/app/data/results
     networks:
       - default
 
@@ -28,7 +28,7 @@ services:
       - ./data/af70d96a-09b5-404a-b236-adb5587777bc:/app/data
     environment:
       - CLIENT_ID=af70d96a-09b5-404a-b236-adb5587777bc
-      - OUTPUT_DIR=/app/data/af70d96a-09b5-404a-b236-adb5587777bc/results
+      - OUTPUT_DIR=/app/data/results
     networks:
       - default
 
@@ -41,7 +41,7 @@ services:
       - ./data/fc5bd853-cc64-44f7-afa5-8c5662997825:/app/data
     environment:
       - CLIENT_ID=fc5bd853-cc64-44f7-afa5-8c5662997825
-      - OUTPUT_DIR=/app/data/fc5bd853-cc64-44f7-afa5-8c5662997825/results
+      - OUTPUT_DIR=/app/data/results
     networks:
       - default
 
@@ -54,7 +54,7 @@ services:
   #     - ./data/29c397ed-13eb-45bc-94ec-1a6582cb731a:/app/data
   #   environment:
   #     - CLIENT_ID=29c397ed-13eb-45bc-94ec-1a6582cb731a
-  #     - OUTPUT_DIR=/app/data/29c397ed-13eb-45bc-94ec-1a6582cb731a/results
+  #     - OUTPUT_DIR=/app/data/results
   #   networks:
   #     - default
 
@@ -67,7 +67,7 @@ services:
   #     - ./data/454f09a2-8142-498f-bdec-504c100e85cb:/app/data
   #   environment:
   #     - CLIENT_ID=454f09a2-8142-498f-bdec-504c100e85cb
-  #     - OUTPUT_DIR=/app/data/454f09a2-8142-498f-bdec-504c100e85cb/results
+  #     - OUTPUT_DIR=/app/data/results
   #   networks:
   #     - default
 
@@ -80,7 +80,7 @@ services:
   #     - ./data/4a220114-6917-43e6-a7c7-1b791f654ec9:/app/data
   #   environment:
   #     - CLIENT_ID=4a220114-6917-43e6-a7c7-1b791f654ec9
-  #     - OUTPUT_DIR=/app/data/4a220114-6917-43e6-a7c7-1b791f654ec9/results
+  #     - OUTPUT_DIR=/app/data/results
   #   networks:
   #     - default
 
@@ -93,7 +93,7 @@ services:
   #     - ./data/39013c3c-5848-4f74-8300-af0ce7bf8c2b:/app/data
   #   environment:
   #     - CLIENT_ID=39013c3c-5848-4f74-8300-af0ce7bf8c2b
-  #     - OUTPUT_DIR=/app/data/39013c3c-5848-4f74-8300-af0ce7bf8c2b/results
+  #     - OUTPUT_DIR=/app/data/results
   #   networks:
   #     - default
 
@@ -106,7 +106,7 @@ services:
   #     - ./data/fa9561cd-115e-4fb6-8701-621276d27427:/app/data
   #   environment:
   #     - CLIENT_ID=fa9561cd-115e-4fb6-8701-621276d27427
-  #     - OUTPUT_DIR=/app/data/fa9561cd-115e-4fb6-8701-621276d27427/results
+  #     - OUTPUT_DIR=/app/data/results
   #   networks:
   #     - default
 
@@ -119,7 +119,7 @@ services:
   #     - ./data/2bb5276c-f1be-4455-baa5-06023a44ed5e:/app/data
   #   environment:
   #     - CLIENT_ID=2bb5276c-f1be-4455-baa5-06023a44ed5e
-  #     - OUTPUT_DIR=/app/data/2bb5276c-f1be-4455-baa5-06023a44ed5e/results
+  #     - OUTPUT_DIR=/app/data/results
   #   networks:
   #     - default
 
@@ -132,6 +132,6 @@ services:
   #     - ./data/c8887490-ef31-459d-9e18-cf68fdb19edd:/app/data
   #   environment:
   #     - CLIENT_ID=c8887490-ef31-459d-9e18-cf68fdb19edd
-  #     - OUTPUT_DIR=/app/data/c8887490-ef31-459d-9e18-cf68fdb19edd/results
+  #     - OUTPUT_DIR=/app/data/results
   #   networks:
   #     - default

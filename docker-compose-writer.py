@@ -24,7 +24,7 @@ services:
       - ./data/{client_id}:/app/data
     environment:
       - CLIENT_ID={client_id}
-      - OUTPUT_DIR=/app/data/{client_id}/results
+      - OUTPUT_DIR=/app/data/results
     networks:
       - default
 """
