@@ -71,7 +71,6 @@ class Gateway:
 
 def callback_result_client(self, ch, method, properties, body, queue_name, callback_arg: MessageTransferProtocol):
     message = json.loads(body)
-    logging.warning(f'Received message: {message}')
     # PENDING: propagate message_id all they way back to the client.
     if message.get('type') == 'EOF':
         callback_arg.send_message(MESSAGE_FLAG['EOF'], self.id, message['message_id'], json.dumps({'file': queue_name}))

@@ -165,6 +165,6 @@ class DynamicFilter(Worker):
                 message.update(item)
                 if self.filter_condition(self.state, message):
                     filtered_messages.append(item)
-            message['items'] = filtered_messages
-            self.connection.send_message(self.dst_exchange, self.routing_key, json.dumps(message))
+            batch['items'] = filtered_messages
+            self.connection.send_message(self.dst_exchange, self.routing_key, json.dumps(batch))
         ch.basic_ack(delivery_tag=method.delivery_tag)

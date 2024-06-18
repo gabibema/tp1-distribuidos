@@ -23,7 +23,7 @@ def aggregate(msg, accumulator):
 
 def result(msg, accumulator):
     authors = [author for author, decades in accumulator.pop(msg['request_id'], {}).items() if len(decades) >= 10]
-    return json.dumps({'request_id': msg['request_id'], 'authors': authors})
+    return json.dumps([{'request_id': msg['request_id'], 'authors': authors}])
 
 def main():
     # Pending: move variables to env.

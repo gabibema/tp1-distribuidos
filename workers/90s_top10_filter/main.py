@@ -11,7 +11,7 @@ def aggregate(msg, accumulator):
 
 def result(msg, accumulator):
     request_titles = accumulator.pop(msg['request_id'], [])
-    return json.dumps({'request_id': msg['request_id'], 'top10': [book for book in nlargest(10, request_titles, key=lambda title: title['count'])]})
+    return json.dumps([{'request_id': msg['request_id'], 'top10': [book for book in nlargest(10, request_titles, key=lambda title: title['count'])]}])
 
 def main():
     # Pending: move variables to env.
