@@ -1,2 +1,4 @@
 /data
+/gateway/backup
 __pycache__
+settings.json

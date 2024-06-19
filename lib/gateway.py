@@ -2,102 +2,91 @@ from io import StringIO
 from csv import DictReader
 import logging
 import json
+import uuid
+
+from lib.transfer.transfer_protocol import MESSAGE_FLAG
 
 MAX_KEY_LENGTH = 255
-NOT_EOF_VALUE = 0
-EOF_VALUE = 1
 
 class BookPublisher():
-    def __init__(self, connection, dst_exchange, dst_exchange_type):
+    def __init__(self, connection, dst_exchange, dst_exchange_type, data_saver):
+        self.data_saver = data_saver
         self.connection = connection
         self.exchange = dst_exchange
         self.connection.create_router(dst_exchange, dst_exchange_type)
 
-    def publish(self, message, routing_key_fn):
-        csv_stream = StringIO(message)
-        uid = csv_stream.readline().strip()
-        reader = DictReader(csv_stream)
-
-        eof_received = NOT_EOF_VALUE
+    def publish(self, client_id, message_id, message_csv, routing_key_fn):
+        eof_received = False
+        reader = DictReader(StringIO(message_csv))
+        rows = []
         for row in reader:
-            row_filtered = {'request_id': uid}
-            if 'type' in row:
-                eof_received = EOF_VALUE if 'EOF' in row['type'] else NOT_EOF_VALUE
-                row_filtered['type'] = row['type']
-            if 'Title' in row:
-                row_filtered['Title'] = row['Title']
-            if 'publishedDate' in row:
-                row_filtered['publishedDate'] = row['publishedDate']
-            if 'categories' in row:
-                row_filtered['categories'] = row['categories']
-            if 'authors' in row:
-                row_filtered['authors'] = row['authors']
-            
-            routing_key = routing_key_fn(row_filtered)
-            self.connection.send_message(self.exchange, routing_key, json.dumps(row_filtered))
-
-        if eof_received == EOF_VALUE:
-            logging.warning(f'{uid} EOF received')
-        else: 
-            logging.warning(f'Received message of length {len(message)}')
+            if row.get('type') == 'EOF':
+                logging.warning(f'{client_id} EOF received')
+                row = {'type': 'EOF'}
+                eof_received = True
+            else:
+                row = {'Title': row['Title'], 'publishedDate': row['publishedDate'], 'categories': row['categories'], 'authors': row['authors']}
+            routing_key = routing_key_fn(row)
+            rows.append(row)
         
+        batch_message = {'request_id': str(client_id), 'message_id': message_id, 'items': rows}
+        self.connection.send_message(self.exchange, routing_key, json.dumps(batch_message))
+        
+        message = {'request_id': str(client_id), 'message_id': message_id, 'source': MESSAGE_FLAG['BOOK'], 'eof': eof_received}
+        self.data_saver.save_message_to_json(message)
         return eof_received
-    
+
     def close(self):
         self.connection.channel.close()
         self.connection.connection.close()
 
 class ReviewPublisher():
-    def __init__(self, connection):
+    def __init__(self, connection, data_saver):
+        self.data_saver = data_saver
         self.connection = connection
 
-    def publish(self, message, routing_key):
-        csv_stream = StringIO(message)
-        uid = csv_stream.readline().strip()
-
-        eof_received = NOT_EOF_VALUE
-        reader = DictReader(csv_stream)
+    def publish(self, client_id, message_id, message_csv, routing_key):
+        eof_received = False
+        reader = DictReader(StringIO(message_csv))
         rows = []
         for row in reader:
-            current_row = {'request_id': uid}
-            if 'Title' in row:
-                current_row['Title'] = row['Title']
-            if 'review/text' in row:
-                current_row['review/text'] = row['review/text']
-            if 'type' in row:
-                current_row['type'] = row['type']
-            if len(current_row) > 1:
-                rows.append(current_row)
-    
-        if len(rows) == 1 and 'type' in rows[0] and 'EOF' in rows[0]['type']:
-            eof_received = EOF_VALUE
-            logging.warning(f'{uid} EOF received')
-        else:
-            logging.warning(f'Received message of length {len(message)}')
+            if row.get('type') == 'EOF':
+                logging.warning(f'{client_id} EOF received')
+                row = {'type': 'EOF'}
+                eof_received = True
+            else:
+                row = {'Title': row['Title'], 'review/text': row['review/text']}
+            rows.append(row)
+        batch_message = {'request_id': str(client_id), 'message_id': message_id, 'items': rows}
+        self.connection.send_message('', routing_key, json.dumps(batch_message))
         
-        full_message = json.dumps(rows)
-        self.connection.send_message('', routing_key, full_message)
+        message = {'request_id': str(client_id), 'message_id': message_id, 'source': MESSAGE_FLAG['REVIEW'], 'eof': eof_received}
+        self.data_saver.save_message_to_json(message)
         return eof_received
-    
+
     def close(self):
         self.connection.channel.close()
         self.connection.connection.close()
 
 class ResultReceiver():
-    def __init__(self, connection, queues, callback, callback_arg):
+    def __init__(self, connection, queues, callback, callback_arg1, callback_arg2, eof_count=0):
         self.connection = connection
         self.callback = callback
-        self.callback_arg = callback_arg
+        self.callback_arg1 = callback_arg1
+        self.callback_arg2 = callback_arg2
+        self.eof_count = eof_count
         for queue_name in queues:
             self.connection.create_queue(queue_name, True)
             self.connection.set_consumer(
                 queue_name,
-                lambda ch, method, properties, body, q=queue_name: callback(self, ch, method, properties, body, q, callback_arg)
+                lambda ch, method, properties, body, q=queue_name: callback(self, ch, method, properties, body, q, callback_arg1, callback_arg2, self.eof_count)
             )
         self.connection.create_router('popular_90s_exchange', 'direct')
         self.connection.link_queue('popular_90s_books', 'popular_90s_exchange', 'popular_90s_queue')
     
-    def start(self):
+    def start(self, eof_count=0):
+        self.eof_count += eof_count
+        logging.warning(f'Starting result receiver with eof_count {self.eof_count}')
         self.connection.begin_consuming()
     
     def close(self):

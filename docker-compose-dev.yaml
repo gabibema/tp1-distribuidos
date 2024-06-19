@@ -15,6 +15,11 @@ services:
   gateway:
     image: gateway:latest
     entrypoint: python3 /app/main.py
+    environment:
+      RECORDS_PATH: "/app/backup/records.json"
+      RESULTS_PATH: "/app/backup/results.json"
+    volumes:
+      - ./gateway/backup:/app/backup
     links:
       - rabbitmq
 

@@ -1,6 +1,6 @@
 import json
 import logging
-from lib.broker import WorkerBroker
+from lib.broker import MessageBroker
 from lib.workers import Aggregate
 
 def aggregate(msg, accumulator):
@@ -23,7 +23,7 @@ def aggregate(msg, accumulator):
 
 def result(msg, accumulator):
     authors = [author for author, decades in accumulator.pop(msg['request_id'], {}).items() if len(decades) >= 10]
-    return json.dumps({'request_id': msg['request_id'], 'authors': authors})
+    return json.dumps([{'request_id': msg['request_id'], 'authors': authors}])
 
 def main():
     # Pending: move variables to env.
@@ -35,7 +35,7 @@ def main():
     src_exchange = 'authors_sharded_exchange'
     dst_routing_key = 'author_decades'
     logging.basicConfig(level=logging.WARNING, format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
-    connection = WorkerBroker(rabbit_hostname)
+    connection = MessageBroker(rabbit_hostname)
     worker = Aggregate(aggregate, result, accumulator, connection=connection, src_queue=src_queue, src_exchange=src_exchange, src_routing_key=src_routing_key, dst_routing_key=dst_routing_key)
     worker.start()
 

@@ -1,6 +1,8 @@
 import json
-from lib.broker import WorkerBroker
+from lib.broker import MessageBroker
 from lib.workers import Aggregate
+
+BATCH_SIZE = 100
 
 def aggregate(msg, accumulator):
     accumulator[msg['request_id']] = accumulator.get(msg['request_id'], {})
@@ -9,7 +11,8 @@ def aggregate(msg, accumulator):
 def result(msg, accumulator):
     acc = accumulator.pop(msg['request_id'], {})
     popular_books = [{'request_id': msg['request_id'], 'Title': title, 'count': count} for title, count in acc.items() if count >= 500]
-    return json.dumps(popular_books)
+    items = [{'Title': title, 'count': count} for title, count in acc.items() if count >= 500]
+    return json.dumps([{'request_id': msg['request_id'], 'items': items[i:i+BATCH_SIZE]} for i in range(0, len(items), BATCH_SIZE)])
 
 def main():
     # Pending: move variables to env.
@@ -19,7 +22,7 @@ def main():
     dst_exchange = 'popular_90s_exchange'
     dst_routing_key = 'popular_90s_queue'
     accumulator = {}
-    connection = WorkerBroker(rabbit_hostname)
+    connection = MessageBroker(rabbit_hostname)
     worker = Aggregate(aggregate, result, accumulator, connection=connection, src_queue=src_queue, dst_exchange=dst_exchange, dst_routing_key=dst_routing_key)
     worker.start()
 

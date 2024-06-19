@@ -1,7 +1,7 @@
 import json
 import random
 from pika.exchange_type import ExchangeType
-from lib.broker import WorkerBroker
+from lib.broker import MessageBroker
 from lib.workers import Aggregate
 
 def aggregate(msg, accumulator):
@@ -14,7 +14,7 @@ def result(msg, accumulator):
     if len(acc) <= 0:
         return json.dumps({'request_id': msg['request_id'], 'percentile': float('inf')})
     percentile = kth_smallest(percentile_10_idx, acc, 0, len(acc) - 1)
-    return json.dumps({'request_id': msg['request_id'], 'percentile': percentile})
+    return json.dumps([{'request_id': msg['request_id'], 'percentile': percentile}])
 
 def kth_smallest(k, buffer, start, end):
     "Find the Kth smallest value in O(n) time"
@@ -67,7 +67,7 @@ def main():
     dst_exchange = 'nlp_percentile_exchange'
     dst_routing_key = 'nlp_percentile_queue'
     accumulator = {}
-    connection = WorkerBroker(rabbit_hostname)
+    connection = MessageBroker(rabbit_hostname)
     worker = Aggregate(aggregate, result, accumulator, connection=connection, src_queue=src_queue, src_exchange=src_exchange, src_routing_key=src_routing_key, src_exchange_type=ExchangeType.topic, dst_exchange=dst_exchange, dst_routing_key=dst_routing_key)
     worker.start()
 
