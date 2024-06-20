@@ -43,11 +43,13 @@ docker-compose-client: docker-image-client
 docker-compose-down:
 	docker compose -f docker-compose-dev.yaml stop -t 1
 	docker compose -f docker-compose-dev.yaml down
+	rm -r gateway/backup
 .PHONY: docker-compose-down
 
 docker-compose-down-client:
 	docker compose -f docker-compose-client.yaml stop -t 1
 	docker compose -f docker-compose-client.yaml down
+	rm -r data/*/results
 .PHONY: docker-compose-down-client
 
 docker-compose-down-all:
