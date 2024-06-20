@@ -7,7 +7,7 @@ class duplicateFilterState():
 
 class State():
     def __init__(self):
-        self.duplicate_filter = duplicateFilterState()
+        self.duplicate_filter = {}
         pass
 
     def save():
@@ -17,18 +17,21 @@ class State():
         pass
 
 
-def is_duplicate(message_id, state):
+def is_duplicate(request_id, message_id, state):
     """
-    Checks if a message with the same message ID has arrived in the past.
-    It also adds the message_id to the state for future verifications.
+    Checks if a message with the same message ID has arrived in the past for that request_id.
+    It also updates the state to reflect that the ID has arrived. It does not save the state.
     """
-    if message_id > state.max_id:
-        state.pending.extend(pending_id for pending_id in range(state.max_id + 1, message_id))
-        state.max_id = message_id
+    client_specific_state = state.get(request_id, duplicateFilterState())
+    state[request_id] = client_specific_state
+    if message_id > client_specific_state.max_id:
+        client_specific_state.pending.extend(pending_id for pending_id in range(client_specific_state.max_id + 1, message_id))
+        logging.warning(f"Pending IDs: {client_specific_state.pending}")
+        client_specific_state.max_id = message_id
         return False
     else:
         try:
-            state.pending.remove(message_id)
+            client_specific_state.pending.remove(message_id)
             return False
         except ValueError:
             # ID is not pending, message is a duplicate.

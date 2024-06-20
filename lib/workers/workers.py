@@ -12,7 +12,6 @@ class Worker(ABC):
     def new(self, connection, src_queue='', src_exchange='', src_routing_key=[''], src_exchange_type=ExchangeType.direct, dst_exchange='', dst_routing_key='', dst_exchange_type=ExchangeType.direct):
         self.connection = connection
         self.connection.channel.basic_qos(prefetch_count=50, global_qos=True)
-        self.state = State()
 
         # init source queue and bind to exchange
         self.connection.create_queue(src_queue, persistent=True)
@@ -158,12 +157,13 @@ class Aggregate(Worker):
         self.result_fn = result_fn
         self.accumulator = accumulator
         self.message_id = 1
+        self.state = State()
         super().new(*args, **kwargs)
 
     def callback(self, ch, method, properties, body):
         'Callback given to a queue to invoke for each message in the queue'
         batch = json.loads(body)
-        if is_duplicate(batch['message_id'], self.state.duplicate_filter):
+        if is_duplicate(batch['request_id'], batch['message_id'], self.state.duplicate_filter):
             self.connection.acknowledge_message(method.delivery_tag)
             return
         for item in batch['items']:
@@ -188,6 +188,8 @@ class Aggregate(Worker):
             message['message_id'] = self.message_id
             self.message_id += 1
             self.connection.send_message(self.dst_exchange, self.routing_key, json.dumps(message))
+        eof_message['message_id'] = self.message_id
+        self.message_id += 1
         self.connection.send_message(self.dst_exchange, self.routing_key, json.dumps(eof_message))
 
 
