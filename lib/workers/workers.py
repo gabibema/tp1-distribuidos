@@ -2,8 +2,9 @@ from abc import ABC, abstractmethod
 from time import sleep, time
 import json
 import logging
-from pika.exchange_type import ExchangeType
 import pika
+from pika.exchange_type import ExchangeType
+from lib.fault_tolerance import State, is_duplicate
 
 WAIT_TIME_PIKA=5
 
@@ -11,6 +12,7 @@ class Worker(ABC):
     def new(self, connection, src_queue='', src_exchange='', src_routing_key=[''], src_exchange_type=ExchangeType.direct, dst_exchange='', dst_routing_key='', dst_exchange_type=ExchangeType.direct):
         self.connection = connection
         self.connection.channel.basic_qos(prefetch_count=50, global_qos=True)
+        self.state = State()
 
         # init source queue and bind to exchange
         self.connection.create_queue(src_queue, persistent=True)
@@ -161,6 +163,9 @@ class Aggregate(Worker):
     def callback(self, ch, method, properties, body):
         'Callback given to a queue to invoke for each message in the queue'
         batch = json.loads(body)
+        if is_duplicate(batch['message_id'], self.state.duplicate_filter):
+            self.connection.acknowledge_message(method.delivery_tag)
+            return
         for item in batch['items']:
             message = {'request_id': batch['request_id'], 'message_id': batch['message_id']}
             message.update(item)
