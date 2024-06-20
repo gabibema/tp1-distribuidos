@@ -22,6 +22,33 @@ services:
       - ./gateway/backup:/app/backup
     links:
       - rabbitmq
+    networks:
+      - gateway
+      - default
+
+  healthcheck1:
+    image: healthcheck:latest
+    entrypoint: python3 /app/main.py
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    links:
+      - rabbitmq
+    environment:
+      ID: "1"
+      HOSTNAME: "rabbitmq"
+
+  healthcheck2:
+    image: healthcheck:latest
+    entrypoint: python3 /app/main.py
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    links:
+      - rabbitmq
+    environment:
+      ID: "2"
+      HOSTNAME: "rabbitmq"
 
   count_90s_revs_by_title-1:
     container_name: count_90s_revs_by_title-1
@@ -225,3 +252,7 @@ services:
         condition: service_healthy
     links:
       - rabbitmq
+
+networks:
+  gateway:
+    driver: bridge

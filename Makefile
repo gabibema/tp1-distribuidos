@@ -6,6 +6,7 @@ all:
 docker-image:
 	docker build -f ./base-image/Dockerfile -t "rabbitmq-python-base:latest" .
 	docker build -f ./rabbitmq/Dockerfile -t "rabbitmq:latest" .
+	docker build -f ./healthcheck/Dockerfile -t "healthcheck:latest" .
 	docker build -f ./gateway/Dockerfile -t "gateway:latest" .
 	docker build -f ./workers/90s_reviews_filter/Dockerfile -t "90s_reviews_filter:latest" .
 	docker build -f ./workers/90s_title_barrier/Dockerfile -t "90s_title_barrier:latest" .
