@@ -1,4 +1,5 @@
 import json
+from pika.exchange_type import ExchangeType
 from lib.broker import MessageBroker
 from lib.workers import Aggregate
 
@@ -25,7 +26,7 @@ def main():
     dst_routing_key = f'90s_titles_shard{shard_id}'
     accumulator = {}
     connection = MessageBroker(rabbit_hostname)
-    worker = Aggregate(aggregate, result, accumulator, connection=connection, src_queue=src_queue, src_exchange=src_exchange, src_routing_key=src_routing_key, dst_exchange=dst_exchange, dst_routing_key=dst_routing_key)
+    worker = Aggregate(aggregate, result, accumulator, connection=connection, src_queue=src_queue, src_exchange=src_exchange, src_routing_key=src_routing_key, dst_exchange=dst_exchange, dst_exchange_type=ExchangeType.fanout, dst_routing_key=dst_routing_key)
     worker.start()
 
 if __name__ == '__main__':
