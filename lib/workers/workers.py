@@ -178,7 +178,6 @@ class Aggregate(Worker):
 
     def end(self, ch, method, properties, body):
         eof_message = json.loads(body)
-        logging.warning(f'{self.dst_exchange=}, {self.routing_key=}')
         self.message_id_per_request[eof_message['request_id']] = self.message_id_per_request.get(eof_message['request_id'], 1)
         result = self.result_fn(eof_message, self.accumulator)
         messages = json.loads(result)
