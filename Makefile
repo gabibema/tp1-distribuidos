@@ -37,7 +37,8 @@ docker-compose-up: docker-image
 	docker compose -f docker-compose-dev.yaml up -d --build
 .PHONY: docker-compose-up
 
-docker-compose-client: docker-image-client 
+docker-compose-client: docker-image-client
+	rm -r data/*/results
 	docker compose -f docker-compose-client.yaml up -d --build
 .PHONY: docker-compose-client
 
@@ -50,7 +51,6 @@ docker-compose-down:
 docker-compose-down-client:
 	docker compose -f docker-compose-client.yaml stop -t 1
 	docker compose -f docker-compose-client.yaml down
-	rm -r data/*/results
 .PHONY: docker-compose-down-client
 
 docker-compose-down-all:
