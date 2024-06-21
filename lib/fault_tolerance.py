@@ -20,7 +20,7 @@ class State():
 def is_duplicate(request_id, message_id, state):
     """
     Checks if a message with the same message ID has arrived in the past for that request_id.
-    It also updates the state to reflect that the ID has arrived. It does not save the state.
+    It also updates the state to reflect that the ID has arrived. It does not save the state, thus it needs to be saved outside of this function.    
     """
     client_specific_state = state.get(request_id, duplicateFilterState())
     state[request_id] = client_specific_state
@@ -36,3 +36,14 @@ def is_duplicate(request_id, message_id, state):
             # ID is not pending, message is a duplicate.
             logging.warning(f"Found duplicate message with ID '{message_id}'")
             return True
+
+
+def is_repeated(request_id, message_id, state):
+    """
+    Checks if message_id equals the ID of the last message received.
+    Works to detect duplicates coming from the same worker.
+    It also updates the state for future validations. It does not save the state, thus it needs to be saved outside of this function.    
+    """
+    last_message_id = state.get(request_id)
+    state[request_id] = message_id
+    return message_id == last_message_id

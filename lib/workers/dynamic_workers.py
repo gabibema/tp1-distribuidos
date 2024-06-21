@@ -2,6 +2,7 @@ import json
 import logging
 from abc import abstractmethod
 from .workers import Worker, ParallelWorker
+from lib.fault_tolerance import State, is_repeated
 
 class DynamicWorker(Worker):
     """
@@ -131,15 +132,19 @@ class DynamicFilter(Worker):
         self.update_state = update_state
         self.filter_condition = filter_condition
         self.tmp_queues_prefix = tmp_queues_prefix
-        self.state = {}
+        self.filter_state = {}
+        self.duplicates_state = {}
         super().new(*args, **kwargs)
 
     def callback(self, ch, method, properties, body):
         'Callback used to update the internal state, to change how future messages are filtered'
         msg = json.loads(body)
+        if is_repeated(msg['request_id'], msg['message_id'], self.duplicates_state):
+            ch.basic_ack(delivery_tag=method.delivery_tag)
+            return
         # Ignore EOFs through this queue. Each client will send their EOF through the tmp queue.
         if msg.get('type') != 'EOF':
-            self.state = self.update_state(self.state, msg)
+            self.filter_state = self.update_state(self.filter_state, msg)
             # If there is a new client, subscribe to the new queue
             new_tmp_queue = f"{self.tmp_queues_prefix}_{msg['request_id']}_queue"
             self.connection.create_queue(new_tmp_queue, persistent=True)
@@ -149,7 +154,7 @@ class DynamicFilter(Worker):
     def client_EOF(self, body):
         msg = json.loads(body)
         msg['type'] = 'EOF'
-        self.state = self.update_state(self.state, msg)
+        self.filter_state = self.update_state(self.filter_state, msg)
         tmp_queue = f"{self.tmp_queues_prefix}_{msg['request_id']}_queue"
         self.connection.channel.queue_delete(queue=tmp_queue)
 
@@ -164,7 +169,7 @@ class DynamicFilter(Worker):
             for item in batch['items']:
                 message = {'request_id': batch['request_id'], 'message_id': batch['message_id']}
                 message.update(item)
-                if self.filter_condition(self.state, message):
+                if self.filter_condition(self.filter_state, message):
                     filtered_messages.append(item)
             batch['items'] = filtered_messages
             self.connection.send_message(self.dst_exchange, self.routing_key, json.dumps(batch))
