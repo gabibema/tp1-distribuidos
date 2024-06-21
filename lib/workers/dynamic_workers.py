@@ -95,7 +95,7 @@ class DynamicAggregate(DynamicWorker):
         self.aggregate_fn = aggregate_fn
         self.result_fn = result_fn
         self.accumulator = accumulator
-        self.message_id = 1
+        self.message_id_per_request = {}
         super().new(*args, **kwargs)
 
     def inner_callback(self, ch, method, properties, msg):
@@ -108,14 +108,15 @@ class DynamicAggregate(DynamicWorker):
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
     def end(self, eof_message):
+        self.message_id_per_request[eof_message['request_id']] = self.message_id_per_request.get(eof_message['request_id'], 1)
         messages = self.result_fn(eof_message, self.accumulator)
         for msg in messages:
-            msg['message_id'] = self.message_id
-            self.message_id += 1
+            msg['message_id'] = self.message_id_per_request[msg['request_id']]
+            self.message_id_per_request[msg['request_id']] += 1
             routing_key = f"{self.routing_key}_{msg['request_id']}"
             self.connection.send_message(self.dst_exchange, routing_key, json.dumps(msg))
-        eof_message['message_id'] = self.message_id
-        self.message_id += 1
+        eof_message['message_id'] = self.message_id_per_request[msg['request_id']]
+        self.message_id_per_request[msg['request_id']] += 1
         routing_key = f"{self.routing_key}_{eof_message['request_id']}"
         self.connection.send_message(self.dst_exchange, routing_key, json.dumps(eof_message))
 

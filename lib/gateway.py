@@ -15,7 +15,7 @@ class BookPublisher():
         self.exchange = dst_exchange
         self.connection.create_router(dst_exchange, dst_exchange_type)
 
-    def publish(self, client_id, message_id, message_csv, routing_key_fn):
+    def publish(self, client_id, message_id, message_csv, routing_key):
         eof_received = False
         reader = DictReader(StringIO(message_csv))
         rows = []
@@ -26,12 +26,11 @@ class BookPublisher():
                 eof_received = True
             else:
                 row = {'Title': row['Title'], 'publishedDate': row['publishedDate'], 'categories': row['categories'], 'authors': row['authors']}
-            routing_key = routing_key_fn(row)
             rows.append(row)
-        
+
         batch_message = {'request_id': str(client_id), 'message_id': message_id, 'items': rows}
         self.connection.send_message(self.exchange, routing_key, json.dumps(batch_message))
-        
+
         message = {'request_id': str(client_id), 'message_id': message_id, 'source': MESSAGE_FLAG['BOOK'], 'eof': eof_received}
         self.data_saver.save_message_to_json(message)
         return eof_received

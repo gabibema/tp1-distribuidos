@@ -41,13 +41,13 @@ class Gateway:
         protocol = MessageTransferProtocol(client)
         connection = MessageBroker("rabbitmq")
         result_receiver = ResultReceiver(connection, self.result_queues, callback_result_client, protocol, self.data_saver_results)
-        book_publisher = BookPublisher(connection, 'books_exchange', ExchangeType.topic, self.data_saver)
+        book_publisher = BookPublisher(connection, 'books_exchange', ExchangeType.fanout, self.data_saver)
         review_publisher = ReviewPublisher(connection, self.data_saver)
         self.__main_loop_client(protocol, router, book_publisher, review_publisher)
-        
+
         #normal_dict = {k: dict(v) for k, v in self.data_saver.shared_rows.items()}
         #logging.warning(f'Final dict is: {normal_dict}')
-        
+
         eof_count = self.__fetch_results_checkpoint(protocol)
         result_receiver.start(eof_count)
 
@@ -57,7 +57,7 @@ class Gateway:
         if flag != MESSAGE_FLAG['CHECKPOINT']:
             logging.error(f'Expected checkpoint message, but received {flag}')        
             return eof_count
-        
+
         results = self.data_saver_results.get(client_id)
         for result in results:
             logging.warning(f'Processing result: {result}')
@@ -70,7 +70,7 @@ class Gateway:
             else:
                 protocol.send_message(MESSAGE_FLAG['RESULT'],client_id,result['message_id'], 
                                       json.dumps({'file':result['source'], 'body':message}))
-        
+
         protocol.send_message(MESSAGE_FLAG['END_CHECKPOINT'], client_id, 1, '')
         return eof_count
 
@@ -81,7 +81,7 @@ class Gateway:
             eof_count += 1
         if MESSAGE_FLAG['REVIEW'] in client_checkpoint and client_checkpoint[MESSAGE_FLAG['REVIEW']].get('eof'):
             eof_count += 1
-            
+
         return eof_count, dict(client_checkpoint)
 
     def __main_loop_client(self, protocol, router, book_publisher, review_publisher):
@@ -97,7 +97,7 @@ class Gateway:
 
     def __handle_message(self, flag, client_id, message_id, message, book_publisher, review_publisher, protocol):
         if flag == MESSAGE_FLAG['BOOK']:
-            return book_publisher.publish(client_id, message_id, message, get_books_keys)
+            return book_publisher.publish(client_id, message_id, message, '')
         elif flag == MESSAGE_FLAG['REVIEW']:
             return review_publisher.publish(client_id, message_id, message, 'reviews_queue')
         elif flag == MESSAGE_FLAG['CHECKPOINT']:
@@ -107,20 +107,20 @@ class Gateway:
         else:
             logging.error(f'Unsupported message flag {repr(flag)}')
             return 0
-            
+
     def __wait_workers(self):
         connection = MessageBroker("rabbitmq")
-        book_publisher = BookPublisher(connection, 'books_exchange', ExchangeType.topic)
+        book_publisher = BookPublisher(connection, 'books_exchange', ExchangeType.fanout)
         review_publisher = ReviewPublisher(connection)
         result_receiver = ResultReceiver(connection, self.result_queues, callback_result, self.result_queues.copy(), 0)
 
         client_id = 'READINESS_PROBE'
         message_id = 0
-        book_publisher.publish(client_id, message_id, '', get_books_keys)
+        book_publisher.publish(client_id, message_id, '', '')
         review_publisher.publish(client_id, message_id, '', 'reviews_queue')
         book_publisher.close()
         review_publisher.close()
-        
+
         result_receiver.start()
         result_receiver.close()
 
@@ -147,13 +147,7 @@ def callback_result_client(self, ch, method, properties, body, queue_name, callb
     self.connection.acknowledge_message(method.delivery_tag)
     if eof_count == RESULTS_BACKLOG:
         ch.stop_consuming()
-        
-"""
-Para books:
-2024-06-13 19:15:43 gateway-1                        |  {'request_id': 'f412e42c-8f80-4d1c-882f-fac6a88d8465', 'authors': ["'John Ruskin'", "'Oscar Wilde'", "'Bertrand Russell'", "'Charles Kingsley'", "'Nathaniel Hawthorne'", "'Edgar Allan Poe'", "'Charles Dickens'", "'Edgar Rice Burroughs'", "'Erle Stanley Gardner'", "'Thomas Hardy'", "'William Shakespeare'", "'Franklin W. Dixon'", "'Arthur Conan Doyle'", "'Graham Greene'", "'Sigmund Freud'", "'Henry James'", "'John Bunyan'", "'Zane Grey'", "'Dante Alighieri'", "'Henry David Thoreau'", "'Henry Adams'", "'Joseph Conrad'", "'Agatha Christie'", "'Thomas Carlyle'", "'Henry Wadsworth Longfellow'", "'Voltaire'", "'Francis Parkman'", "'Rudyard Kipling'", "'Jack London'", "'Daniel Defoe'", "'Bernard Shaw'", "'Walter Scott'", "'William Dean Howells'", "'Robert Louis Stevenson'", "'Washington Irving'", "'James Fenimore Cooper'", "'Jules Verne'", "'Anthony Trollope'", "'Ellery Queen'", "'Jane Austen'", "'Alexandre Dumas'", "'Ernest Hemingway'", "'Mark Twain'", "'William Makepeace Thackeray'", "'Charles Darwin'", "'Charles Haddon Spurgeon'", "'Louisa May Alcott'", "'Ralph Waldo Emerson'", "'Henrik Ibsen'", "'Herbert George Wells'", "'Andrew Murray'", "'Miguel de Cervantes Saavedra'", "'Thomas Jefferson'", "'Lewis Carroll'", "'Gilbert Keith Chesterton'", "'Mary Roberts Rinehart'", "'Plato'", "'Lafcadio Hearn'", "'Karl Marx'", "'Emanuel Swedenborg'", "'Herman Melville'", "'John Milton'", "'Niccolò Machiavelli'", "'Edward Gibbon'"]}
-2024-06-13 19:15:43 gateway-1                        |  {'request_id': 'f412e42c-8f80-4d1c-882f-fac6a88d8465', 'message_id': 55, 'type': 'EOF'}
-2024-06-17 19:21:25 gateway-1                        |  {'request_id': '551d0f23-17c9-48ef-b32a-3b1d129c8709', 'top10': [{'request_id': '551d0f23-17c9-48ef-b32a-3b1d129c8709', 'Title': 'Pride and Prejudice', 'count': 20371}, {'request_id': '551d0f23-17c9-48ef-b32a-3b1d129c8709', 'Title': "The Hitchhiker's Guide to the Galaxy", 'count': 4042}, {'request_id': '551d0f23-17c9-48ef-b32a-3b1d129c8709', 'Title': 'A Tree Grows in Brooklyn', 'count': 3904}, {'request_id': '551d0f23-17c9-48ef-b32a-3b1d129c8709', 'Title': 'Harry Potter and the Chamber of Secrets', 'count': 3137}, {'request_id': '551d0f23-17c9-48ef-b32a-3b1d129c8709', 'Title': 'Slaughterhouse-Five', 'count': 2975}, {'request_id': '551d0f23-17c9-48ef-b32a-3b1d129c8709', 'Title': 'Rich Dad, Poor Dad', 'count': 2734}, {'request_id': '551d0f23-17c9-48ef-b32a-3b1d129c8709', 'Title': 'Memoirs of a Geisha (Signed)', 'count': 2693}, {'request_id': '551d0f23-17c9-48ef-b32a-3b1d129c8709', 'Title': 'The Lord of the Rings (3 Volume Set)', 'count': 2478}, {'request_id': '551d0f23-17c9-48ef-b32a-3b1d129c8709', 'Title': 'Wuthering Heights (Signet classics)', 'count': 2160}, {'request_id': '551d0f23-17c9-48ef-b32a-3b1d129c8709', 'Title': 'Catch 22', 'count': 2084}]}
-"""
+
 
 def callback_result(ch, method, properties, body, queue_name, callback_arg):
     message = json.loads(body)
@@ -177,17 +171,3 @@ def get_uid(body):
         return body['request_id']
     elif isinstance(body, list) and body and 'request_id' in body[0]:
         return body[0]['request_id']
-
-
-def get_books_keys(row):
-    if 'type' in row and row['type'] == 'EOF':
-        return 'EOF'
-
-    date_str = row['publishedDate']
-    try:
-        year = int(date_str.split('-', maxsplit=1)[0])
-        decade = year - year % 10
-        return str(decade)
-    except ValueError:
-        # invalid date format
-        return ''

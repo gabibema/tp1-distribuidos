@@ -23,6 +23,7 @@ docker-image:
 	docker build -f ./workers/fiction_reviews_filter/Dockerfile -t "fiction_reviews_filter:latest" .
 	docker build -f ./workers/fiction_title_barrier/Dockerfile -t "fiction_title_barrier:latest" .
 	docker build -f ./workers/fiction_title_sharder/Dockerfile -t "fiction_title_sharder:latest" .
+	docker build -f ./workers/90s_category_filter/Dockerfile -t "90s_category_filter:latest" .
 	docker build -f ./workers/title_sharder/Dockerfile -t "title_sharder:latest" .
 
 

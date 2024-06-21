@@ -20,13 +20,12 @@ def main():
     rabbit_hostname = 'rabbitmq'
     src_queue = 'authors_book_queue'
     src_exchange = 'books_exchange'
-    src_routing_key = '#'
     dst_exchange = 'authors_sharded_exchange'
     dst_routing_key = 'authors'
     logging.basicConfig(level=logging.WARNING, format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
     connection = MessageBroker(rabbit_hostname)
     control_queue_prefix = 'ctrl_author_sharder'
-    worker = Router(routing_fn, control_queue_prefix, connection=connection, src_queue=src_queue, src_exchange=src_exchange, src_routing_key=src_routing_key, src_exchange_type=ExchangeType.topic, dst_exchange=dst_exchange, dst_routing_key=dst_routing_key)
+    worker = Router(routing_fn, control_queue_prefix, connection=connection, src_queue=src_queue, src_exchange=src_exchange, src_exchange_type=ExchangeType.fanout, dst_exchange=dst_exchange, dst_routing_key=dst_routing_key)
     worker.start()
 
 if __name__ == '__main__':

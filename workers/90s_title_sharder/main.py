@@ -1,5 +1,4 @@
 import json
-from pika.exchange_type import ExchangeType
 from lib.broker import MessageBroker
 from lib.workers import Router
 SHARD_COUNT = 1
@@ -18,14 +17,13 @@ def main():
     # Pending: update SHARD_COUNT variable to match the env.
     SHARD_COUNT = 1
     rabbit_hostname = 'rabbitmq'
-    src_queue = '90s_queue'
-    src_exchange = 'books_exchange'
-    src_routing_key = '1990'
+    src_queue = '90s_filtered_queue'
+    src_exchange = '90s_filtered_exchange'
     dst_exchange = '90s_books_sharded_exchange'
     dst_routing_key = '90s_books'
     connection = MessageBroker(rabbit_hostname)
     control_queue_prefix = 'ctrl_90s_title_sharder'
-    worker = Router(routing_fn, control_queue_prefix, connection=connection, src_queue=src_queue, src_exchange=src_exchange, src_routing_key=src_routing_key, src_exchange_type=ExchangeType.topic, dst_exchange=dst_exchange, dst_routing_key=dst_routing_key)
+    worker = Router(routing_fn, control_queue_prefix, connection=connection, src_queue=src_queue, src_exchange=src_exchange, dst_exchange=dst_exchange, dst_routing_key=dst_routing_key)
     worker.start()
 
 if __name__ == '__main__':

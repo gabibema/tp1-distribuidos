@@ -156,7 +156,7 @@ class Aggregate(Worker):
         self.aggregate_fn = aggregate_fn
         self.result_fn = result_fn
         self.accumulator = accumulator
-        self.message_id = 1
+        self.message_id_per_request = {}
         self.state = State()
         super().new(*args, **kwargs)
 
@@ -179,17 +179,18 @@ class Aggregate(Worker):
     def end(self, ch, method, properties, body):
         eof_message = json.loads(body)
         logging.warning(f'{self.dst_exchange=}, {self.routing_key=}')
+        self.message_id_per_request[eof_message['request_id']] = self.message_id_per_request.get(eof_message['request_id'], 1)
         result = self.result_fn(eof_message, self.accumulator)
         messages = json.loads(result)
         if type(messages) != list:
             logging.error('Result is not a list')
             messages = [messages]
         for message in messages:
-            message['message_id'] = self.message_id
-            self.message_id += 1
+            message['message_id'] = self.message_id_per_request[eof_message['request_id']]
+            self.message_id_per_request[eof_message['request_id']] += 1
             self.connection.send_message(self.dst_exchange, self.routing_key, json.dumps(message))
-        eof_message['message_id'] = self.message_id
-        self.message_id += 1
+        eof_message['message_id'] = self.message_id_per_request[eof_message['request_id']]
+        self.message_id_per_request[eof_message['request_id']] += 1
         self.connection.send_message(self.dst_exchange, self.routing_key, json.dumps(eof_message))
 
 
