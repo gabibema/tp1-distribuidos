@@ -4,20 +4,13 @@ from lib.broker import MessageBroker
 from lib.workers import Filter
 
 def category_filter(body):
-    # PENDING.
-    batch = json.loads(body)
-    return False
-    filtered_items = []
-    for item in batch['items']:
-        date_str = item['publishedDate']
-        try:
-            year = int(date_str.split('-', maxsplit=1)[0])
-            decade = year - year % 10
-            if decade == 1990:
-                filtered_items.append(item)
-        except ValueError:
-            continue
-
+    date_str = json.loads(body)['publishedDate']
+    try:
+        year = int(date_str.split('-', maxsplit=1)[0])
+        decade = year - year % 10
+        return decade == 1990
+    except ValueError:
+        return False
 
 def main():
     # Pending: move variables to env.
