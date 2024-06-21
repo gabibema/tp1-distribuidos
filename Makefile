@@ -38,14 +38,14 @@ docker-compose-up: docker-image
 .PHONY: docker-compose-up
 
 docker-compose-client: docker-image-client
-	rm -r data/*/results
+	rm -r data/*/results || true
 	docker compose -f docker-compose-client.yaml up -d --build
 .PHONY: docker-compose-client
 
 docker-compose-down:
 	docker compose -f docker-compose-dev.yaml stop -t 1
 	docker compose -f docker-compose-dev.yaml down
-	rm -r gateway/backup
+	rm -r gateway/backup || true
 .PHONY: docker-compose-down
 
 docker-compose-down-client:
