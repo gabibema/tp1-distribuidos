@@ -1,3 +1,6 @@
+networks:
+  gateway:
+    driver: bridge
 
 services:
   rabbitmq:
@@ -12,19 +15,6 @@ services:
       retries: 5
       start_period: 10s
 
-  gateway:
-    image: gateway:latest
-    entrypoint: python3 /app/main.py
-    environment:
-      RECORDS_PATH: "/app/backup/records.json"
-      RESULTS_PATH: "/app/backup/results.json"
-    volumes:
-      - ./gateway/backup:/app/backup
-    links:
-      - rabbitmq
-    networks:
-      - gateway
-      - default
 
   healthcheck1:
     image: healthcheck:latest
@@ -49,6 +39,20 @@ services:
     environment:
       ID: "2"
       HOSTNAME: "rabbitmq"
+
+  gateway:
+    image: gateway:latest
+    entrypoint: python3 /app/main.py
+    environment:
+      RECORDS_PATH: "/app/backup/records.json"
+      RESULTS_PATH: "/app/backup/results.json"
+    volumes:
+      - ./gateway/backup:/app/backup
+    links:
+      - rabbitmq
+    networks:
+      - gateway
+      - default
 
   count_90s_revs_by_title-1:
     container_name: count_90s_revs_by_title-1
@@ -252,7 +256,3 @@ services:
         condition: service_healthy
     links:
       - rabbitmq
-
-networks:
-  gateway:
-    driver: bridge
