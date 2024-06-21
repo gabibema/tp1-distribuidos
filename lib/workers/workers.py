@@ -11,7 +11,7 @@ WAIT_TIME_PIKA=5
 class Worker(ABC):
     def new(self, connection, src_queue='', src_exchange='', src_routing_key=[''], src_exchange_type=ExchangeType.direct, dst_exchange='', dst_routing_key='', dst_exchange_type=ExchangeType.direct):
         self.connection = connection
-        self.connection.channel.basic_qos(prefetch_count=50, global_qos=True)
+        self.connection.channel.basic_qos(prefetch_count=1, global_qos=True)
 
         # init source queue and bind to exchange
         self.connection.create_queue(src_queue, persistent=True)
