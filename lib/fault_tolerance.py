@@ -26,7 +26,6 @@ def is_duplicate(request_id, message_id, state):
     state[request_id] = client_specific_state
     if message_id > client_specific_state.max_id:
         client_specific_state.pending.extend(pending_id for pending_id in range(client_specific_state.max_id + 1, message_id))
-        logging.warning(f"Pending IDs: {client_specific_state.pending}")
         client_specific_state.max_id = message_id
         return False
     else:
