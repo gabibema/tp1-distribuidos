@@ -10,6 +10,7 @@ from lib.broker import MessageBroker
 from lib.gateway import BookPublisher, ResultReceiver, ReviewPublisher, MAX_KEY_LENGTH
 from lib.transfer.transfer_protocol import MESSAGE_FLAG, MessageTransferProtocol, RouterProtocol
 from lib.workers.workers import wait_rabbitmq
+from lib.healthcheck import Healthcheck, HEALTH
 
 CLIENTS_BACKLOG = 5
 RESULTS_BACKLOG = 5
@@ -21,14 +22,14 @@ class Gateway:
         self.router = RouterProtocol()
         self.data_saver = DataSaver(config['records_path'])
         self.data_saver_results = DataSaver(config['results_path'], mode=ALL_ROWS)
-        logging.warning(f'Gateway initialized with save path {config["records_path"]}')
+        self.healthcheck = Process(target=Healthcheck().listen_healthchecks)
         self.conn = None
 
     def start(self):
         self.conn = socket(AF_INET, SOCK_STREAM)
         self.conn.bind(('', self.port))
+        self.healthcheck.start()
         wait_rabbitmq()
-        #self.__wait_workers()
 
         while True:
             self.conn.listen(CLIENTS_BACKLOG)
@@ -44,9 +45,6 @@ class Gateway:
         book_publisher = BookPublisher(connection, 'books_exchange', ExchangeType.topic, self.data_saver)
         review_publisher = ReviewPublisher(connection, self.data_saver)
         self.__main_loop_client(protocol, router, book_publisher, review_publisher)
-        
-        #normal_dict = {k: dict(v) for k, v in self.data_saver.shared_rows.items()}
-        #logging.warning(f'Final dict is: {normal_dict}')
         
         eof_count = self.__fetch_results_checkpoint(protocol)
         result_receiver.start(eof_count)
@@ -141,7 +139,7 @@ def callback_result_client(self, ch, method, properties, body, queue_name, callb
             logging.warning(f'EOF received from {queue_name}. Total EOFs: {self.eof_count}')
         else:
             callback_arg1.send_message(MESSAGE_FLAG['RESULT'],request_id,message_id, json.dumps({'file':queue_name, 'body':body}))
-    except Exception as _:
+    except Exception:
         pass
 
     self.connection.acknowledge_message(method.delivery_tag)

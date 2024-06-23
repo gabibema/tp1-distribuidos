@@ -27,7 +27,9 @@ services:
     environment:
       ID: "1"
       HOSTNAME: "rabbitmq"
-
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      
   healthcheck2:
     image: healthcheck:latest
     entrypoint: python3 /app/main.py
@@ -39,6 +41,22 @@ services:
     environment:
       ID: "2"
       HOSTNAME: "rabbitmq"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    
+  healthcheck3:
+    image: healthcheck:latest
+    entrypoint: python3 /app/main.py
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    links:
+      - rabbitmq
+    environment:
+      ID: "3"
+      HOSTNAME: "rabbitmq"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
 
   gateway:
     image: gateway:latest
@@ -46,6 +64,9 @@ services:
     environment:
       RECORDS_PATH: "/app/backup/records.json"
       RESULTS_PATH: "/app/backup/results.json"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
     volumes:
       - ./gateway/backup:/app/backup
     links:

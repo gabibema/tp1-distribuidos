@@ -1,11 +1,12 @@
+from concurrent.futures import ProcessPoolExecutor
 from multiprocessing import Process, Manager, Event
-from multiprocessing.managers import ListProxy
+import socket
 from time import sleep
 from lib.broker import MessageBroker
 from pika.exchange_type import ExchangeType
+from lib.healthcheck import HEALTHCHECK_PORT
+import docker
 import logging
-
-LEADER_ID = 1000000
 
 class PeerStorage:
     def __init__(self):
@@ -25,19 +26,18 @@ class PeerStorage:
         for peer in self.peers.keys():
             self.peers[peer] = False
 
-
 class Bully:
-    def __init__(self, config):
+    def __init__(self, config, bully_leader_event, leadership_event):
         self.manager = Manager()
         self.health = True
         self.id = self.manager.Value('i', config['id'])
         self.hostname = config['hostname']
         self.stored_peers = PeerStorage()
-        self.receiver = Process(target=self.__receive, args=(self.stored_peers,))
-        self.sender = Process(target=self.__send, args=(self.stored_peers,))
+        self.receiver = Process(target=self.__receive)
+        self.sender = Process(target=self.__send, args=(bully_leader_event, leadership_event))
 
     def start(self):
-        try: 
+        try:
             self.receiver.start()
             self.sender.start()
         except Exception as e:
@@ -46,7 +46,7 @@ class Bully:
             self.receiver.join()
             self.sender.join()
 
-    def __init_connection(self, stored_peers):
+    def __init_connection(self):
         connection = MessageBroker(self.hostname)
         connection.create_router("health_bully", ExchangeType.fanout)
         result = connection.create_queue("", False)
@@ -57,49 +57,123 @@ class Bully:
         connection.set_consumer(result.method.queue, lambda ch, method, properties, body: self.__callback(ch, method, properties, body, connection_sender))
         return connection
 
-    def __receive(self, stored_peers: ListProxy):
-        connection = self.__init_connection(stored_peers)
+    def __receive(self):
+        connection = self.__init_connection()
         try:
             connection.begin_consuming()
         finally:
             connection.close_connection()
 
-    def __send(self, stored_peers: PeerStorage):
+    def __send(self, leader_event, leadership_event):
         connection = MessageBroker(self.hostname)
         connection.create_router("health_bully", ExchangeType.fanout)
         try:
             while True:
-                #logging.warning(f"Already in stored_peers: {list(self.stored_peers.get_peers())}")
                 connection.send_message("health_bully", "", str(self.id.value))
-                #logging.warning(f"Sent {self.id.value}") 
                 sleep(5)
                 peers = list(self.stored_peers.get_peers())
-                #logging.warning(f"Peers: {peers}")
-                if len(peers) and self.id.value == max(peers):
-                    #logging.warning(f"I'm the bully: {self.id.value}")
-                    self.id.value = LEADER_ID
-                
+
+                if self.__is_new_leader(peers):
+                    leader_event.set()
+                    if not leadership_event.is_set():
+                        leadership_event.set()
+                else:
+                    if leadership_event.is_set():
+                        leadership_event.clear()
+
                 self.stored_peers.delete_peers()
-                sleep(30)
+                sleep(10)
         finally:
             connection.close_connection()
 
+    def __is_new_leader(self, peers):
+        return len(peers) and self.id.value == max(peers)
+
     def __callback(self, ch, method, properties, body, connection):
         if not self.stored_peers.peer_exists(self.id.value):
-            #logging.warning(f"Sending {self.id.value} because i'm not in stored_peers")
             connection.send_message("health_bully", "", str(self.id.value))
             self.stored_peers.add_peer(self.id.value)
         body = int(body)
-        if not self.stored_peers.peer_exists(body):
-            #logging.warning(f"Adding {body}")
-            self.stored_peers.add_peer(body)
-            
-        ch.basic_ack(delivery_tag=method.delivery_tag)
 
+        if not self.stored_peers.peer_exists(body):
+            self.stored_peers.add_peer(body)
+
+        ch.basic_ack(delivery_tag=method.delivery_tag)
 
 class HealthChecker:
     def __init__(self, config):
-        self.bully = Bully(config)
+        self.bully_leader_event = Event()
+        self.leadership_event = Event()
+        self.bully = Bully(config, self.bully_leader_event, self.leadership_event)
+        self.checker = Process(target=self.__healthcheck)
 
     def start(self):
-        self.bully.start()
+        try:
+            self.checker.start()
+            self.bully.start()
+        except Exception as e:
+            logging.error(f"Error starting health checker: {e}")
+        finally:
+            self.checker.join()
+            self.bully.join()
+
+    def __healthcheck(self):
+        self.bully_leader_event.wait()
+        client = docker.DockerClient()
+        logging.warning(f"Healthchecker started with id: {self.bully.id.value}")
+        while True:
+            sleep(10)
+            self.leadership_event.wait()
+            logging.warning(f"I'm the leader with id: {self.bully.id.value}")
+            self.check_containers(client, "tp1-distribuidos")
+
+    def check_containers(self, client, project_name):
+        containers = client.containers.list(filters={"label": f"com.docker.compose.project={project_name}"})
+        for container in containers:
+            self.check_container(container)
+
+
+    def check_container(self, container):
+        health_status = self.get_healthcheck_message(container)
+        logging.warning(f"Health status for container {container.name}: {health_status}")
+        #if not health_status or container.status != 'running':
+        if container.status != 'running':
+            self.start_container(container)
+            return f"Container {container.name} restarted."
+
+    def start_container(self, container):
+        try:
+            container.start()
+            logging.info(f"Container {container.name} started successfully.")
+        except Exception as e:
+            logging.error(f"Failed to start container {container.name}: {str(e)}")
+
+    def get_healthcheck_message(self, container):
+        try:
+            ip_address = container.attrs['NetworkSettings']['Networks']['tp1-distribuidos_default']['IPAddress']
+            logging.warning(f"Checking health for container {container.name} with ip {ip_address}")
+
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.connect((ip_address, HEALTHCHECK_PORT))
+                response = s.recv(1)
+                return bool(response)
+        except Exception as e:
+            return False
+
+
+
+    # def check_containers(self, client: docker.DockerClient, project_name="tp1-distribuidos"):
+    #     containers = client.containers.list(filters={"label": f"com.docker.compose.project={project_name}"}, all=True)
+    #     for container in containers:
+    #         if container.status != 'running':
+    #             logging.warning(f"Container {container.name} is not running. Starting it.")
+    #             self.start_container(container)
+    #         else:
+    #             logging.warning(f"Container {container.name} is running.")
+
+    # def start_container(self, container):
+    #     container_name = container.name
+    #     try:
+    #         container.start()   
+    #     except docker.errors.NotFound:
+    #         logging.warning(f"El contenedor '{container_name}' no fue encontrado.")

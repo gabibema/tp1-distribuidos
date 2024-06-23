@@ -50,17 +50,7 @@ class DataSaver:
     
     def __load_from_file(self):
         with FILE_LOCK:
-            # try:
-                # with open(self.path, 'r') as f:
-                #     content = f.read()
-                #     messages = content.split('\n}\n{')
-                #     messages = ['{' + msg + '}' if not msg.startswith('{') else msg + '}' if not msg.endswith('}') else msg for msg in messages]
-                #     for msg in messages:
-                #         logging.warning(f'Loading message: {msg}')
-                #         message = json.loads(msg)
-                #         if 'request_id' not in message:
-                #             continue
-                #         self.save_message_in_memory(message)
+
             with open(self.path, 'r') as f:
                 content = f.read()
                 # Split the content based on the pattern '\n}\n{'
