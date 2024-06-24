@@ -41,6 +41,7 @@ class Gateway:
         logging.warning(f'New client connection: {client}')
         protocol = MessageTransferProtocol(client)
         connection = MessageBroker("rabbitmq")
+        HEALTH.set_broken()
         result_receiver = ResultReceiver(connection, self.result_queues, callback_result_client, protocol, self.data_saver_results)
         book_publisher = BookPublisher(connection, 'books_exchange', ExchangeType.topic, self.data_saver)
         review_publisher = ReviewPublisher(connection, self.data_saver)

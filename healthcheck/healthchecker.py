@@ -4,9 +4,18 @@ import socket
 from time import sleep
 from lib.broker import MessageBroker
 from pika.exchange_type import ExchangeType
-from lib.healthcheck import HEALTHCHECK_PORT
+from lib.healthcheck import HEALTHCHECK_PORT, Healthcheck, HEALTH
 import docker
 import logging
+import signal
+
+EXCLUDED_SERVICES = ['rabbitmq', "client"]
+
+def signal_handler(sig, frame):
+    logging.warning(f"System shutdown received {sig}.")
+    raise SystemExit("System shutdown.")
+signal.signal(signal.SIGTERM, signal_handler)
+signal.signal(signal.SIGINT, signal_handler)
 
 class PeerStorage:
     def __init__(self):
@@ -29,7 +38,6 @@ class PeerStorage:
 class Bully:
     def __init__(self, config, bully_leader_event, leadership_event):
         self.manager = Manager()
-        self.health = True
         self.id = self.manager.Value('i', config['id'])
         self.hostname = config['hostname']
         self.stored_peers = PeerStorage()
@@ -41,6 +49,7 @@ class Bully:
             self.receiver.start()
             self.sender.start()
         except Exception as e:
+            HEALTH.set_broken()
             logging.error(f"Error starting health checker: {e}")
         finally:
             self.receiver.join()
@@ -55,13 +64,16 @@ class Bully:
         connection_sender = MessageBroker(self.hostname)
         connection_sender.create_router("health_bully", ExchangeType.fanout)
         connection.set_consumer(result.method.queue, lambda ch, method, properties, body: self.__callback(ch, method, properties, body, connection_sender))
-        return connection
+        return connection, connection_sender
 
     def __receive(self):
-        connection = self.__init_connection()
+        connection, connection_aux = self.__init_connection()
         try:
             connection.begin_consuming()
+        except:
+            logging.error(f"Leaving the bully process.")
         finally:
+            connection_aux.close_connection()
             connection.close_connection()
 
     def __send(self, leader_event, leadership_event):
@@ -83,6 +95,8 @@ class Bully:
 
                 self.stored_peers.delete_peers()
                 sleep(10)
+        except:
+            logging.error(f"Leaving the bully process.")
         finally:
             connection.close_connection()
 
@@ -99,47 +113,55 @@ class Bully:
             self.stored_peers.add_peer(body)
 
         ch.basic_ack(delivery_tag=method.delivery_tag)
-
+    
 class HealthChecker:
     def __init__(self, config):
         self.bully_leader_event = Event()
         self.leadership_event = Event()
         self.bully = Bully(config, self.bully_leader_event, self.leadership_event)
         self.checker = Process(target=self.__healthcheck)
+        self.healthchecker = Process(target=Healthcheck().listen_healthchecks)
 
     def start(self):
         try:
+            self.healthchecker.start()
             self.checker.start()
             self.bully.start()
         except Exception as e:
+            HEALTH.set_broken()
             logging.error(f"Error starting health checker: {e}")
         finally:
+            self.healthchecker.join()
             self.checker.join()
-            self.bully.join()
 
     def __healthcheck(self):
-        self.bully_leader_event.wait()
-        client = docker.DockerClient()
-        logging.warning(f"Healthchecker started with id: {self.bully.id.value}")
-        while True:
-            sleep(10)
-            self.leadership_event.wait()
-            logging.warning(f"I'm the leader with id: {self.bully.id.value}")
-            self.check_containers(client, "tp1-distribuidos")
+        try:
+            self.bully_leader_event.wait()
+            client = docker.DockerClient()
+            logging.warning(f"Healthchecker started with id: {self.bully.id.value}")
+            while True:
+                sleep(10)
+                self.leadership_event.wait()
+                logging.warning(f"I'm the leader with id: {self.bully.id.value}")
+                self.check_containers(client, "tp1-distribuidos")
+        except:
+            logging.error(f"Leaving the healthchecker process.")
+        finally:
+            client.close()
 
-    def check_containers(self, client, project_name):
-        containers = client.containers.list(filters={"label": f"com.docker.compose.project={project_name}"})
+    def check_containers(self, client: docker.DockerClient, project_name):
+        containers = client.containers.list(filters={"label": f"com.docker.compose.project={project_name}"}, all=True)
         for container in containers:
+            if any(service in container.name for service in EXCLUDED_SERVICES):
+                continue
             self.check_container(container)
 
 
     def check_container(self, container):
         health_status = self.get_healthcheck_message(container)
-        logging.warning(f"Health status for container {container.name}: {health_status}")
-        #if not health_status or container.status != 'running':
-        if container.status != 'running':
+        if not health_status or container.status != 'running':
+            logging.warning(f"Restarting container {container.name} with status {container.status} and health status {health_status}.")
             self.start_container(container)
-            return f"Container {container.name} restarted."
 
     def start_container(self, container):
         try:
@@ -151,29 +173,11 @@ class HealthChecker:
     def get_healthcheck_message(self, container):
         try:
             ip_address = container.attrs['NetworkSettings']['Networks']['tp1-distribuidos_default']['IPAddress']
-            logging.warning(f"Checking health for container {container.name} with ip {ip_address}")
 
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 s.connect((ip_address, HEALTHCHECK_PORT))
                 response = s.recv(1)
-                return bool(response)
+                logging.warning(f"Healthcheck response for container {container.name}: {response}")
+                return int.from_bytes(response, byteorder='big')
         except Exception as e:
-            return False
-
-
-
-    # def check_containers(self, client: docker.DockerClient, project_name="tp1-distribuidos"):
-    #     containers = client.containers.list(filters={"label": f"com.docker.compose.project={project_name}"}, all=True)
-    #     for container in containers:
-    #         if container.status != 'running':
-    #             logging.warning(f"Container {container.name} is not running. Starting it.")
-    #             self.start_container(container)
-    #         else:
-    #             logging.warning(f"Container {container.name} is running.")
-
-    # def start_container(self, container):
-    #     container_name = container.name
-    #     try:
-    #         container.start()   
-    #     except docker.errors.NotFound:
-    #         logging.warning(f"El contenedor '{container_name}' no fue encontrado.")
+            return 0

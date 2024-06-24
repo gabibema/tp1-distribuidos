@@ -53,6 +53,9 @@ class MessageBroker():
     def acknowledge_message(self, message_id):
         self.channel.basic_ack(delivery_tag=message_id)
     
+    def close_connection(self):
+        self.connection.close()
+    
     def wait_connection(self, host='rabbitmq', timeout=120, interval=10):
         """
         Waits for RabbitMQ to be available.
