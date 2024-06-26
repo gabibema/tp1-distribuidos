@@ -58,6 +58,7 @@ class Gateway:
         while True:
                 self.conn.listen(CLIENTS_BACKLOG)
                 client, addr = self.conn.accept()
+                logging.warning(f'Client connection established: {addr}')
                 process = Process(target=self.__handle_client, args=(client, self.router)).start()
                 self.processes.append(process)
 

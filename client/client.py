@@ -1,7 +1,7 @@
 import os
 from multiprocessing import Process, Queue, Value
 from socket import SOCK_STREAM, socket, AF_INET, create_connection
-from time import sleep, time
+from time import time
 from uuid import UUID
 from uuid import uuid4
 from csv import DictWriter
@@ -41,37 +41,36 @@ class Client:
         self.__send_from_queue(self.books_queue, self.reviews_queue)
         self.books_sender.join()
         self.reviews_sender.join()
-        return self.__request_results()
-
-    def __try_start(self):
-        try:
-            self.start()
-        except Exception as e:
-            self.books_queue.close()
-            self.reviews_queue.close()
-            logging.error(f"Error running client: {e}")
-            return False
+        self.__request_results()
 
 
-    def __try_connect(self, host='gateway', port='5000', interval=5):
-        while True:
+    def __try_connect(self, host, port, timeout=15):
+        actual_time = time()
+        while time() - actual_time < timeout:
             try:
                 conn = create_connection((host, port))
                 return conn
             except:
-                logging.warning(f'Connection to {host}:{port} failed. Retrying...')
-                sleep(interval)
                 pass
 
-    def __request_checkpoint(self):
-        self.__try_send(MESSAGE_FLAG['CHECKPOINT'], 1, '')
-        flag, _gateway_id, message_id, message = self.__try_receive()
-        return loads(message)
+        raise SystemError('Could not connect to the server')    # not handled at the moment
 
+    def __request_checkpoint(self):
+        protocol = MessageTransferProtocol(self.conn)
+        protocol.send_message(MESSAGE_FLAG['CHECKPOINT'], self.uuid, 1, '')
+        flag, _gateway_id, message_id, message = protocol.receive_message()
+
+        if flag == MESSAGE_FLAG['CHECKPOINT']:
+            return loads(message)
+        else:
+            raise SystemError('Invalid response from the server')    # not handled at the moment
 
     def __enqueue_file(self, path, queue, source):
         # Batch message format:
         # field1,field2,...
+        # value1,value2,...
+        # value1,value2,...
+        # ...
         source = str(source)
         start_id = 1
         eof = None
@@ -114,27 +113,29 @@ class Client:
         return books_queue.empty() and reviews_queue.empty() and not self.books_sender.is_alive() and not self.reviews_sender.is_alive()
 
     def __send_from_queue(self, books_queue: Queue, reviews_queue: Queue):
+        protocol = MessageTransferProtocol(self.conn)
+
         while True:
             if not books_queue.empty():
                 message_id, message = books_queue.get()
-                self.__try_send( MESSAGE_FLAG['BOOK'], message_id, message)
+                protocol.send_message(MESSAGE_FLAG['BOOK'], self.uuid, message_id, message)
             if not reviews_queue.empty():
                 message_id, message = reviews_queue.get()
-                self.__try_send( MESSAGE_FLAG['REVIEW'], message_id, message)
+                protocol.send_message(MESSAGE_FLAG['REVIEW'], self.uuid, message_id, message)
+
             if self.__sending_completed(books_queue, reviews_queue):
                 break
 
     def __request_results(self):
+        protocol = MessageTransferProtocol(self.conn)
         eof_count = 0
         while eof_count < RESULT_FILES_AMOUNT:
-            flag = self.__handle_result()
+            flag = self.__handle_result(protocol)
             if flag == MESSAGE_FLAG['EOF']:
                 eof_count += 1
-        
-        return True
 
-    def __handle_result(self):
-        flag, _gateway_id, message_id, message = self.__try_receive()
+    def __handle_result(self, protocol: MessageTransferProtocol):
+        flag, _gateway_id, message_id, message = protocol.receive_message()
         if flag == MESSAGE_FLAG['RESULT']:
             body = loads(message)
             #logging.warning(f"Received message with ID '{message_id}' from Gateway'")
@@ -144,29 +145,7 @@ class Client:
 
     def __save_in_file(self, filename, body: dict):
         filepath = os.path.join(self.output_dir, f'{filename}.csv')
+        file_exists = os.path.isfile(filepath)
         if body:
             with open(filepath, 'a+', newline='') as file:
                 file.write(body)
-
-    def __try_receive(self):
-        protocol = MessageTransferProtocol(self.conn)
-        while True:
-            try:
-                return protocol.receive_message()
-            except:
-                self.conn.close()
-                self.conn = self.__try_connect(port=self.port)
-                logging.warning('Connection lost. Reconnecting...to receive message.')
-                protocol = MessageTransferProtocol(self.conn)
-
-    def __try_send(self, flag, message_id, message):
-        protocol = MessageTransferProtocol(self.conn)
-        while True:
-            sent_bytes = protocol.send_message(flag, self.uuid, message_id, message)
-            if sent_bytes:
-                return
-            self.conn.close()
-            self.conn = self.__try_connect(port=self.port)
-            logging.warning('Connection lost. Reconnecting...to send message.')
-            protocol = MessageTransferProtocol(self.conn)
-
