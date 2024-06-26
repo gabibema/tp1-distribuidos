@@ -10,6 +10,7 @@ import logging
 import signal
 
 EXCLUDED_SERVICES = ['rabbitmq', "client"]
+HEALTHCHECK_FREQUENCY = 25
 
 def signal_handler(sig, frame):
     logging.warning(f"System shutdown received {sig}.")
@@ -140,9 +141,8 @@ class HealthChecker:
             client = docker.DockerClient()
             logging.warning(f"Healthchecker started with id: {self.bully.id.value}")
             while True:
-                sleep(10)
+                sleep(HEALTHCHECK_FREQUENCY)
                 self.leadership_event.wait()
-                logging.warning(f"I'm the leader with id: {self.bully.id.value}")
                 self.check_containers(client, "tp1-distribuidos")
         except:
             logging.error(f"Leaving the healthchecker process.")
@@ -159,12 +159,15 @@ class HealthChecker:
 
     def check_container(self, container):
         health_status = self.get_healthcheck_message(container)
+        #logging.warning(f"Healthcheck response for container {container.name}: {health_status}")
         if not health_status or container.status != 'running':
-            logging.warning(f"Restarting container {container.name} with status {container.status} and health status {health_status}.")
+            logging.warning(f"Restarting container {container.name}")
             self.start_container(container)
 
     def start_container(self, container):
         try:
+            if container.status == 'running':
+                container.kill()
             container.start()
             logging.info(f"Container {container.name} started successfully.")
         except Exception as e:
@@ -177,7 +180,7 @@ class HealthChecker:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 s.connect((ip_address, HEALTHCHECK_PORT))
                 response = s.recv(1)
-                logging.warning(f"Healthcheck response for container {container.name}: {response}")
                 return int.from_bytes(response, byteorder='big')
         except Exception as e:
+            logging.error(f"Error connecting to container {container.name}: {str(e)}")
             return 0

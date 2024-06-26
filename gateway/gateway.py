@@ -2,6 +2,7 @@ import json
 import logging
 from multiprocessing import Process
 from socket import SOCK_STREAM, socket, AF_INET
+from time import sleep
 from typing import Tuple
 from uuid import UUID
 from pika.exchange_type import ExchangeType
@@ -32,6 +33,8 @@ class Gateway:
         self.data_saver = DataSaver(config['records_path'])
         self.data_saver_results = DataSaver(config['results_path'], mode=ALL_ROWS)
         self.healthcheck = Process(target=Healthcheck().listen_healthchecks)
+        self.processes = []
+        self.health = HEALTH
         self.conn = None
 
     def start(self):
@@ -40,11 +43,23 @@ class Gateway:
         self.healthcheck.start()
         wait_rabbitmq()
 
-        while True:
-            self.conn.listen(CLIENTS_BACKLOG)
-            client, addr = self.conn.accept()
-            Process(target=self.__handle_client, args=(client, self.router)).start()
+        try: 
+            self.__handle_clients()
+        except:
+            self.health.set_broken
+        finally:
+            self.conn.close()
+            self.healthcheck.join()
+            for process in self.processes:
+                process.join()
+            self.router.close()
 
+    def __handle_clients(self):
+        while True:
+                self.conn.listen(CLIENTS_BACKLOG)
+                client, addr = self.conn.accept()
+                process = Process(target=self.__handle_client, args=(client, self.router)).start()
+                self.processes.append(process)
 
     def __handle_client(self, client:socket, router: RouterProtocol):
         protocol = MessageTransferProtocol(client)
