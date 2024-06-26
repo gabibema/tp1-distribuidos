@@ -41,7 +41,7 @@ class Client:
         self.__send_from_queue(self.books_queue, self.reviews_queue)
         self.books_sender.join()
         self.reviews_sender.join()
-        self.__save_results()
+        self.__request_results()
 
 
     def __try_connect(self, host, port, timeout=15):
@@ -126,28 +126,13 @@ class Client:
             if self.__sending_completed(books_queue, reviews_queue):
                 break
 
-    def __save_results(self):
+    def __request_results(self):
         protocol = MessageTransferProtocol(self.conn)
-        eof_count = self.__request_previous_results(protocol)
-        logging.warning(f'Previous results received with eofs count: {eof_count}')
+        eof_count = 0
         while eof_count < RESULT_FILES_AMOUNT:
             flag = self.__handle_result(protocol)
             if flag == MESSAGE_FLAG['EOF']:
                 eof_count += 1
-
-    def __request_previous_results(self, protocol):
-        protocol = MessageTransferProtocol(self.conn)
-        protocol.send_message(MESSAGE_FLAG['CHECKPOINT'], self.uuid, 1, '')
-        eof_count = 0
-        flag = None
-
-        while eof_count < RESULT_FILES_AMOUNT and flag != MESSAGE_FLAG['END_CHECKPOINT']:
-            flag = self.__handle_result(protocol)
-            if flag == MESSAGE_FLAG['EOF']:
-                eof_count += 1
-    
-        return eof_count
-
 
     def __handle_result(self, protocol: MessageTransferProtocol):
         flag, _gateway_id, message_id, message = protocol.receive_message()
@@ -161,23 +146,6 @@ class Client:
     def __save_in_file(self, filename, body: dict):
         filepath = os.path.join(self.output_dir, f'{filename}.csv')
         file_exists = os.path.isfile(filepath)
-
-        if 'authors' in body:
-            body_list = [{'author': author} for author in body['authors']]
-            body = body_list
-        elif 'top10' in body:
-            body = body['top10']
-
-        if isinstance(body, dict):
-            body = body['items'] if 'items' in body else [body]
-        for row in body:
-            row.pop('request_id', None)
-            row.pop('message_id', None)
-
         if body:
             with open(filepath, 'a+', newline='') as file:
-                writer = DictWriter(file, fieldnames=body[0].keys())
-                if not file_exists or file.tell() == 0:
-                    writer.writeheader()
-
-                writer.writerows(body)
+                file.write(body)

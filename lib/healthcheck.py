@@ -26,7 +26,6 @@ class Healthcheck:
         self.socket.listen(HEALTHCHECK_BACKLOG)
         try:
             while True:
-                logging.warning("Listening for healthchecks")
                 conn, addr = self.socket.accept()
                 try:
                     conn.sendall(bytes([HEALTH.health.value]))

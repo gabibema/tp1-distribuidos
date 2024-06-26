@@ -1,3 +1,5 @@
+import csv
+import io
 import json
 import logging
 from multiprocessing import Manager, Lock
@@ -16,6 +18,7 @@ class DataSaver:
     def __init__(self, path, mode=LATEST_ROW):
         self.manager = Manager()
         self.shared_rows = self.manager.dict()
+        self.eof_data = self.manager.dict()
         self.path = path
         self.mode = mode
         self.__load_from_file()
@@ -26,15 +29,24 @@ class DataSaver:
             with open(self.path, 'a') as f:
                 json.dump(message, f, indent=4)
                 f.write('\n')
+    
+    def save_eof(self, uid, source):
+        uid = str(uid)
+        if not self.eof_data.get(uid):
+            self.eof_data[uid] = 0
         
+        self.eof_data[uid] += 1
+
     def save_message_in_memory(self, message):
+        message['request_id'] = str(message['request_id'])
         uid = message['request_id']
         source = message['source']
         self.__create_if_not_exists(uid)
+        if message.get('eof', False):
+            self.save_eof(uid, source)
 
         if self.mode == ALL_ROWS:
             self.shared_rows[uid].append(message)
-            logging.warning(f'Added message to {uid}: messages stored: {len(self.shared_rows[uid])}')
         elif self.mode == LATEST_ROW:
             self.shared_rows[uid][source] = message
     
@@ -44,26 +56,18 @@ class DataSaver:
         elif self.mode == LATEST_ROW and uid not in self.shared_rows:
             self.shared_rows[uid] = self.manager.dict()
         
-
-    def get_row(self, uid):
-        return self.shared_rows.get(uid, None)
-    
     def __load_from_file(self):
         with FILE_LOCK:
 
             with open(self.path, 'r') as f:
                 content = f.read()
-                # Split the content based on the pattern '\n}\n{'
                 messages = content.split('\n}\n{')
-                # Adjust the boundaries of each message
                 if len(messages) > 1:
                     messages[0] += '}'
                     messages[-1] = '{' + messages[-1]
                     for i in range(1, len(messages) - 1):
                         messages[i] = '{' + messages[i] + '}'
-                # Process each message
                 for msg in messages:
-                    #logging.warning(f'Loading message: {msg}')
                     try:
                         message = json.loads(msg)
                         if 'request_id' not in message:
@@ -76,16 +80,18 @@ class DataSaver:
             # except json.JSONDecodeError:
             #     logging.error(f'Error while decoding JSON from file: {self.path}')
 
-        try:
-            normal_dict = {k: dict(v) for k, v in self.shared_rows.items()}
-            logging.warning(f'Loaded {len(self.shared_rows)} entries')
-        except ValueError as e:
-            logging.error(f'Error converting shared_rows to dictionary: {e}')
-            # Attempt a different approach to handle the data if needed
-            normal_dict = {k: v for k, v in self.shared_rows.items()}
-            logging.warning(f'Loaded {len(self.shared_rows)} entries (without conversion)')
-
-
     def get(self, uid):
         uid = str(uid)
         return self.shared_rows.get(uid, {})
+    
+    def get_eof_count(self, uid):
+        return self.eof_data.get(str(uid), 0)
+
+def write_csv_to_string(headers, rows):
+    output = io.StringIO()
+    writer = csv.writer(output, lineterminator='\n')
+    if headers:
+        writer.writerow(headers)
+    if rows:
+        writer.writerows(rows)
+    return output.getvalue()
