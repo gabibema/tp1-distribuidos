@@ -1,4 +1,3 @@
-
 services:
   rabbitmq:
     image: rabbitmq:latest
@@ -27,6 +26,8 @@ services:
     container_name: count_90s_revs_by_title-1
     image: count_90s_revs_by_title:latest
     entrypoint: python3 /app/main.py
+    volumes:
+      - count_90s_revs_by_title-1:/var
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -37,6 +38,8 @@ services:
     container_name: fiction_category_filter-1
     image: fiction_category_filter:latest
     entrypoint: python3 /app/main.py
+    volumes:
+      - fiction_category_filter-1:/var
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -57,6 +60,8 @@ services:
     container_name: fiction_title_barrier-1
     image: fiction_title_barrier:latest
     entrypoint: python3 /app/main.py
+    volumes:
+      - fiction_title_barrier-1:/var
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -71,6 +76,8 @@ services:
     container_name: 90s_top10_filter-1
     image: 90s_top10_filter:latest
     entrypoint: python3 /app/main.py
+    volumes:
+      - 90s_top10_filter-1:/var
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -81,6 +88,8 @@ services:
     container_name: fiction_reviews_filter-1
     image: fiction_reviews_filter:latest
     entrypoint: python3 /app/main.py
+    volumes:
+      - fiction_reviews_filter-1:/var
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -100,6 +109,8 @@ services:
     container_name: 90s_category_filter-1
     image: 90s_category_filter:latest
     entrypoint: python3 /app/main.py
+    volumes:
+      - 90s_category_filter-1:/var
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -110,6 +121,8 @@ services:
     container_name: 90s_title_barrier-1
     image: 90s_title_barrier:latest
     entrypoint: python3 /app/main.py
+    volumes:
+      - 90s_title_barrier-1:/var
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -120,6 +133,8 @@ services:
     container_name: computer_books_filter-1
     image: computer_books_filter:latest
     entrypoint: python3 /app/main.py
+    volumes:
+      - computer_books_filter-1:/var
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -130,6 +145,8 @@ services:
     container_name: author_decades_filter-1
     image: author_decades_filter:latest
     entrypoint: python3 /app/main.py
+    volumes:
+      - author_decades_filter-1:/var
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -140,6 +157,8 @@ services:
     container_name: fiction_percentile_calculator-1
     image: fiction_percentile_calculator:latest
     entrypoint: python3 /app/main.py
+    volumes:
+      - fiction_percentile_calculator-1:/var
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -150,6 +169,8 @@ services:
     container_name: title_sharder-1
     image: title_sharder:latest
     entrypoint: python3 /app/main.py
+    volumes:
+      - title_sharder-1:/var
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -160,6 +181,8 @@ services:
     container_name: title_sharder-2
     image: title_sharder:latest
     entrypoint: python3 /app/main.py
+    volumes:
+      - title_sharder-2:/var
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -170,6 +193,8 @@ services:
     container_name: title_sharder-3
     image: title_sharder:latest
     entrypoint: python3 /app/main.py
+    volumes:
+      - title_sharder-3:/var
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -180,6 +205,8 @@ services:
     container_name: 90s_title_sharder-1
     image: 90s_title_sharder:latest
     entrypoint: python3 /app/main.py
+    volumes:
+      - 90s_title_sharder-1:/var
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -190,6 +217,8 @@ services:
     container_name: author_sharder-1
     image: author_sharder:latest
     entrypoint: python3 /app/main.py
+    volumes:
+      - author_sharder-1:/var
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -200,6 +229,8 @@ services:
     container_name: fiction_review_nlp-1
     image: fiction_review_nlp:latest
     entrypoint: python3 /app/main.py
+    volumes:
+      - fiction_review_nlp-1:/var
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -210,6 +241,8 @@ services:
     container_name: fiction_title_sharder-1
     image: fiction_title_sharder:latest
     entrypoint: python3 /app/main.py
+    volumes:
+      - fiction_title_sharder-1:/var
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -220,6 +253,8 @@ services:
     container_name: 90s_reviews_filter-1
     image: 90s_reviews_filter:latest
     entrypoint: python3 /app/main.py
+    volumes:
+      - 90s_reviews_filter-1:/var
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -230,8 +265,31 @@ services:
     container_name: fiction_percentile_filter-1
     image: fiction_percentile_filter:latest
     entrypoint: python3 /app/main.py
+    volumes:
+      - fiction_percentile_filter-1:/var
     depends_on:
       rabbitmq:
         condition: service_healthy
     links:
       - rabbitmq
+
+volumes:
+  count_90s_revs_by_title-1:
+  fiction_category_filter-1:
+  fiction_title_barrier-1:
+  90s_top10_filter-1:
+  fiction_reviews_filter-1:
+  90s_category_filter-1:
+  90s_title_barrier-1:
+  computer_books_filter-1:
+  author_decades_filter-1:
+  fiction_percentile_calculator-1:
+  title_sharder-1:
+  title_sharder-2:
+  title_sharder-3:
+  90s_title_sharder-1:
+  author_sharder-1:
+  fiction_review_nlp-1:
+  fiction_title_sharder-1:
+  90s_reviews_filter-1:
+  fiction_percentile_filter-1:
