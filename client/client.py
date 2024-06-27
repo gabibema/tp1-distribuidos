@@ -54,7 +54,7 @@ class Client:
         except TimeoutError:
             cliend_error = True
         except Exception as e:
-            pass
+            raise e
         finally:
             self.conn.close()
             for sender in self.senders:
