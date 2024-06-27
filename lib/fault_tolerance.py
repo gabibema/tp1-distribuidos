@@ -58,9 +58,9 @@ class DumbDuplicateFilterState():
 def save_state(**kwargs):
     "Saves whatever data the worker needs to be atomically saved."
     state = json.dumps(kwargs)
-    with open('/tmp/temp_worker_state', 'w') as statefile:
+    with open('/var/temp_worker_state', 'w') as statefile:
         statefile.write(state)
-    os.replace('/tmp/temp_worker_state', '/tmp/worker_state')
+    os.replace('/var/temp_worker_state', '/var/worker_state')
 
 
 def load_state():
