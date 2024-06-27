@@ -13,8 +13,8 @@ class MessageBroker():
         self.connection = pika.BlockingConnection(pika.ConnectionParameters(host=hostname))
         self.channel = self.connection.channel()
 
-    def create_queue(self, queue_name, persistent):
-        return self.channel.queue_declare(queue=queue_name, durable=persistent)
+    def create_queue(self, queue_name, persistent, exclusive=False):
+        return self.channel.queue_declare(queue=queue_name, durable=persistent, exclusive=exclusive)
 
     def create_control_queue(self, queue_prefix, control_callback, src_queue, callback, worker_id):
         save_state(id=worker_id)

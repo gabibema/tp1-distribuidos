@@ -90,11 +90,7 @@ class DataSaver:
                             continue
                         self.save_message_in_memory(message)
                     except json.JSONDecodeError as e:
-                        logging.error(f'Error while decoding JSON from message: {msg}\nError: {e}')
-            # except FileNotFoundError:
-            #     logging.warning(f'File not found: {self.path}')
-            # except json.JSONDecodeError:
-            #     logging.error(f'Error while decoding JSON from file: {self.path}')
+                        pass
 
     def get(self, uid):
         uid = str(uid)

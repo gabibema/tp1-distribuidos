@@ -60,7 +60,7 @@ class Bully:
     def __init_connection(self):
         connection = MessageBroker(self.hostname)
         connection.create_router("health_bully", ExchangeType.fanout)
-        result = connection.create_queue("", False)
+        result = connection.create_queue("", False, True)
         connection.link_queue(result.method.queue, "health_bully")
 
         connection_sender = MessageBroker(self.hostname)
@@ -152,7 +152,6 @@ class HealthChecker:
 
     def check_containers(self, client: docker.DockerClient, project_name):
         containers = client.containers.list(filters={"label": f"com.docker.compose.project={project_name}"}, all=True)
-        logging.warning(f"Checking containers: {containers}")
         for container in containers:
             if any(service in container.name for service in EXCLUDED_SERVICES):
                 continue
@@ -160,8 +159,8 @@ class HealthChecker:
 
 
     def check_container(self, container):
-        logging.warning(f"Checking container {container.name} with status {container.status}.")
         if container.status != 'running':
+            logging.warning(f"Restarting container {container.name}.")
             self.start_container(container)
         health_status = self.get_healthcheck_message(container)
         if not health_status:
