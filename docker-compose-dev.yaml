@@ -1,3 +1,7 @@
+networks:
+  gateway:
+    driver: bridge
+
 services:
   rabbitmq:
     image: rabbitmq:latest
@@ -17,10 +21,61 @@ services:
     environment:
       RECORDS_PATH: "/app/backup/records.json"
       RESULTS_PATH: "/app/backup/results.json"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
     volumes:
       - ./gateway/backup:/app/backup
+      - gateway:/var
     links:
       - rabbitmq
+    networks:
+      - gateway
+      - default
+
+
+  healthcheck1:
+    image: healthcheck:latest
+    entrypoint: python3 /app/main.py
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    links:
+      - rabbitmq
+    environment:
+      ID: "1"
+      HOSTNAME: "rabbitmq"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      
+  healthcheck2:
+    image: healthcheck:latest
+    entrypoint: python3 /app/main.py
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    links:
+      - rabbitmq
+    environment:
+      ID: "2"
+      HOSTNAME: "rabbitmq"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    
+  healthcheck3:
+    image: healthcheck:latest
+    entrypoint: python3 /app/main.py
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    links:
+      - rabbitmq
+    environment:
+      ID: "3"
+      HOSTNAME: "rabbitmq"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
 
   count_90s_revs_by_title-1:
     container_name: count_90s_revs_by_title-1
@@ -274,6 +329,7 @@ services:
       - rabbitmq
 
 volumes:
+  gateway:
   count_90s_revs_by_title-1:
   fiction_category_filter-1:
   fiction_title_barrier-1:

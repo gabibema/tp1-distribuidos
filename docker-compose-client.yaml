@@ -12,35 +12,9 @@ services:
     volumes:
       - ./config/client.ini:/app/config.ini
       - ./lib:/app/lib
-      - ./data/f8760039-d0f1-476b-8d7d-b98160ba0378:/app/data
+      - ./data/4df35591-4ad9-45ef-9ed0-8cc9cf99fe3a:/app/data
     environment:
-      - CLIENT_ID=f8760039-d0f1-476b-8d7d-b98160ba0378
-      - OUTPUT_DIR=/app/data/results
-    networks:
-      - default
-
-  client2:
-    image: client:latest
-    entrypoint: python3 /app/main.py
-    volumes:
-      - ./config/client.ini:/app/config.ini
-      - ./lib:/app/lib
-      - ./data/4ff5c5b5-5b41-4173-8211-0c1edac1b4a3:/app/data
-    environment:
-      - CLIENT_ID=4ff5c5b5-5b41-4173-8211-0c1edac1b4a3
-      - OUTPUT_DIR=/app/data/results
-    networks:
-      - default
-
-  client3:
-    image: client:latest
-    entrypoint: python3 /app/main.py
-    volumes:
-      - ./config/client.ini:/app/config.ini
-      - ./lib:/app/lib
-      - ./data/7e016a48-bc4a-4af3-9bb4-83761989f52a:/app/data
-    environment:
-      - CLIENT_ID=7e016a48-bc4a-4af3-9bb4-83761989f52a
+      - CLIENT_ID=4df35591-4ad9-45ef-9ed0-8cc9cf99fe3a
       - OUTPUT_DIR=/app/data/results
     networks:
       - default

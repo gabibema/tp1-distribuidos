@@ -11,7 +11,7 @@ MESSAGE_FLAG = {
     'RESULT': 3,
     'EOF': 4,
     'CHECKPOINT': 5,
-    'END_CHECKPOINT': 6,
+    'END_RESULT': 6,
     'ERROR': 7
 }
 

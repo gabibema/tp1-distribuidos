@@ -2,17 +2,27 @@ import json
 import logging
 from multiprocessing import Process
 from socket import SOCK_STREAM, socket, AF_INET
+from time import sleep
 from typing import Tuple
 from uuid import UUID
 from pika.exchange_type import ExchangeType
-from data_storage import ALL_ROWS, DataSaver
+from data_storage import ALL_ROWS, DataSaver, write_csv_to_string
 from lib.broker import MessageBroker
 from lib.gateway import BookPublisher, ResultReceiver, ReviewPublisher, MAX_KEY_LENGTH
 from lib.transfer.transfer_protocol import MESSAGE_FLAG, MessageTransferProtocol, RouterProtocol
 from lib.workers.workers import wait_rabbitmq
+from lib.healthcheck import Healthcheck, HEALTH
 
 CLIENTS_BACKLOG = 5
 RESULTS_BACKLOG = 5
+source_mapping = {
+    "author_decades": {"headers": ["author"], "key": "authors"},
+    "popular_90s_books": {"headers": ["Title", "count"], "key": "items"},
+    "top_90s_books": {"headers": ["Title", "count"], "key": "top10"},
+    "top_fiction_books": {"headers": ["Title", "average"], "key": "items"},
+    "computer_books": {"headers": [], "key": "items"}
+}
+
 
 class Gateway:
     def __init__(self, config):
@@ -21,58 +31,90 @@ class Gateway:
         self.router = RouterProtocol()
         self.data_saver = DataSaver(config['records_path'])
         self.data_saver_results = DataSaver(config['results_path'], mode=ALL_ROWS)
-        logging.warning(f'Gateway initialized with save path {config["records_path"]}')
+        self.healthcheck = Process(target=Healthcheck().listen_healthchecks)
+        self.processes = []
+        self.health = HEALTH
         self.conn = None
 
     def start(self):
         self.conn = socket(AF_INET, SOCK_STREAM)
         self.conn.bind(('', self.port))
+        self.healthcheck.start()
         wait_rabbitmq()
-        #self.__wait_workers()
 
+        try: 
+            self.__handle_clients()
+        except:
+            self.health.set_broken
+        finally:
+            self.conn.close()
+            self.healthcheck.join()
+            for process in self.processes:
+                process.join()
+            self.router.close()
+
+    def __handle_clients(self):
         while True:
-            self.conn.listen(CLIENTS_BACKLOG)
-            client, addr = self.conn.accept()
-            Process(target=self.__handle_client, args=(client, self.router)).start()
+                self.conn.listen(CLIENTS_BACKLOG)
+                client, addr = self.conn.accept()
+                logging.warning(f'Client connection established: {addr}')
+                process = Process(target=self.__handle_client, args=(client, self.router)).start()
+                self.processes.append(process)
 
-
-    def __handle_client(self, client, router: RouterProtocol):
-        logging.warning(f'New client connection: {client}')
+    def __handle_client(self, client:socket, router: RouterProtocol):
         protocol = MessageTransferProtocol(client)
         connection = MessageBroker("rabbitmq")
         result_receiver = ResultReceiver(connection, self.result_queues, callback_result_client, protocol, self.data_saver_results)
         book_publisher = BookPublisher(connection, 'books_exchange', ExchangeType.fanout, self.data_saver)
         review_publisher = ReviewPublisher(connection, self.data_saver)
-        self.__main_loop_client(protocol, router, book_publisher, review_publisher)
+        client_id = self.__main_loop_client(protocol, router, book_publisher, review_publisher)
+        
+        if self.data_saver_results.get_eof_count(client_id) != RESULTS_BACKLOG:
+            result_receiver.start()
 
-        #normal_dict = {k: dict(v) for k, v in self.data_saver.shared_rows.items()}
-        #logging.warning(f'Final dict is: {normal_dict}')
+        self.__send_results(protocol, client_id)
+        logging.warning(f'Client connection closed: {client_id} all eof received.')
+        connection.close_connection()
 
-        eof_count = self.__fetch_results_checkpoint(protocol)
-        result_receiver.start(eof_count)
-
-    def __fetch_results_checkpoint(self, protocol):
-        flag, client_id, message_id, message = protocol.receive_message()
-        eof_count = 0
-        if flag != MESSAGE_FLAG['CHECKPOINT']:
-            logging.error(f'Expected checkpoint message, but received {flag}')        
-            return eof_count
-
+    def __send_results(self, protocol, client_id):
         results = self.data_saver_results.get(client_id)
+        result_data = {source: "" for source in source_mapping}
+        eof_data = {}
+        client_id = UUID(client_id)
+        
         for result in results:
-            logging.warning(f'Processing result: {result}')
-            message = result['body']
-            if isinstance(message, dict) and message.get('type') == 'EOF':
-                protocol.send_message(MESSAGE_FLAG['EOF'], client_id, result['message_id'], 
-                                        json.dumps({'file': result['source']}))
-                eof_count += 1
-                logging.warning(f'EOF received from {result["source"]}. Total EOFs: {eof_count}')
-            else:
-                protocol.send_message(MESSAGE_FLAG['RESULT'],client_id,result['message_id'], 
-                                      json.dumps({'file':result['source'], 'body':message}))
+            source = result['source']
+            body = result['body']
+            
+            headers = source_mapping[source]["headers"]
+            key = source_mapping[source]["key"]
 
-        protocol.send_message(MESSAGE_FLAG['END_CHECKPOINT'], client_id, 1, '')
-        return eof_count
+            if body.get("type") == "EOF":
+                eof_data[source] = write_csv_to_string(headers, [])
+                continue
+
+            if source == "author_decades":
+                rows = [[author.strip("'")] for author in body.get("authors", [])]
+            else:
+                rows = [[item[header] for header in headers] for item in body.get(key, [])]
+            
+            if not result_data[source]:
+                result_data[source] = write_csv_to_string(headers, rows)
+            else:
+                result_data[source] += write_csv_to_string([], rows)  
+
+        for source, csv_string in result_data.items():
+            if not csv_string:
+                continue
+            print(f"Source: {source}")
+            protocol.send_message(MESSAGE_FLAG['RESULT'], client_id, 1, 
+                                  json.dumps({'file': source, 'body': csv_string}))
+        
+        # Send EOF messages
+        for source, csv_string in eof_data.items():
+            protocol.send_message(MESSAGE_FLAG['EOF'], client_id, 2, 
+                                  json.dumps({'file': source, 'body': csv_string}))
+    
 
     def __get_checkpoint(self, client_id) -> Tuple[int, dict]:
         client_checkpoint = self.data_saver.get(client_id)
@@ -84,7 +126,7 @@ class Gateway:
 
         return eof_count, dict(client_checkpoint)
 
-    def __main_loop_client(self, protocol, router, book_publisher, review_publisher):
+    def __main_loop_client(self, protocol: MessageTransferProtocol, router, book_publisher, review_publisher):
         flag, client_id, message_id, message = protocol.receive_message()
         eof_count, _ = self.__get_checkpoint(client_id)
         self.router.add_connection(protocol, client_id)
@@ -93,6 +135,8 @@ class Gateway:
         while eof_count < 2:
             flag, client_id, message_id, message = protocol.receive_message()
             eof_count += self.__handle_message(flag, client_id, message_id, message, book_publisher, review_publisher, protocol)
+        
+        return str(client_id)
 
 
     def __handle_message(self, flag, client_id, message_id, message, book_publisher, review_publisher, protocol):
@@ -125,27 +169,18 @@ class Gateway:
         result_receiver.close()
 
 
-def callback_result_client(self, ch, method, properties, body, queue_name, callback_arg1: RouterProtocol, callback_arg2: DataSaver, eof_count: int):
+def callback_result_client(self, ch, method, properties, body, queue_name, callback_arg1: RouterProtocol, callback_arg2: DataSaver):
     body = json.loads(body)
     # PENDING: propagate message_id all they way back to the client.
     message_id = body.get('message_id', 1) if isinstance(body, dict) else 1
     request_id = UUID(get_uid(body))
-    logging.warning(f'Received message of length {len(body)} from {queue_name}:\n {body}')
-    saved_body = {'request_id': str(request_id), 'message_id': message_id, 'source': queue_name, 'body': body}
+    #logging.warning(f'Received message of length {len(body)} from {queue_name}:\n {body}')
+    is_eof = body.get('type') == 'EOF'
+    saved_body = {'request_id': request_id, 'message_id': message_id, 'source': queue_name, 'body': body, 'eof': is_eof}
     callback_arg2.save_message_to_json(saved_body)
-
-    try: 
-        if isinstance(body, dict) and body.get('type') == 'EOF':
-            callback_arg1.send_message(MESSAGE_FLAG['EOF'], request_id, message_id, json.dumps({'file': queue_name}))
-            self.eof_count += 1
-            logging.warning(f'EOF received from {queue_name}. Total EOFs: {self.eof_count}')
-        else:
-            callback_arg1.send_message(MESSAGE_FLAG['RESULT'],request_id,message_id, json.dumps({'file':queue_name, 'body':body}))
-    except Exception as _:
-        pass
-
     self.connection.acknowledge_message(method.delivery_tag)
-    if eof_count == RESULTS_BACKLOG:
+    logging.warning(f'EOF count for {request_id}: {callback_arg2.get_eof_count(request_id)}')
+    if callback_arg2.get_eof_count(request_id) == RESULTS_BACKLOG:
         ch.stop_consuming()
 
 
@@ -158,12 +193,6 @@ def callback_result(ch, method, properties, body, queue_name, callback_arg):
 
     if not callback_arg:
         ch.stop_consuming()
-
-def get_uid_raw(message):
-    parts = message.split('\n', 1)
-    if len(parts) > 0:
-        return parts[0]
-    return None
     
 
 def get_uid(body):
