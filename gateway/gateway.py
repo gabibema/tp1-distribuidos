@@ -179,7 +179,6 @@ def callback_result_client(self, ch, method, properties, body, queue_name, callb
     saved_body = {'request_id': request_id, 'message_id': message_id, 'source': queue_name, 'body': body, 'eof': is_eof}
     callback_arg2.save_message_to_json(saved_body)
     self.connection.acknowledge_message(method.delivery_tag)
-    logging.warning(f'EOF count for {request_id}: {callback_arg2.get_eof_count(request_id)}')
     if callback_arg2.get_eof_count(request_id) == RESULTS_BACKLOG:
         ch.stop_consuming()
 
