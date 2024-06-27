@@ -3,6 +3,7 @@ import io
 import json
 import logging
 from multiprocessing import Manager, Lock
+from lib.fault_tolerance import State, is_duplicate
 
 FILE_LOCK = Lock()
 LATEST_ROW = 0
@@ -19,11 +20,23 @@ class DataSaver:
         self.manager = Manager()
         self.shared_rows = self.manager.dict()
         self.eof_data = self.manager.dict()
+        self.states = self.manager.dict()
         self.path = path
         self.mode = mode
         self.__load_from_file()
+    
+    def message_duplicate(self, message):
+        request_id = message['request_id']
+        message_id = message['message_id']
+        source = message['source']
+        if not self.states.get(source):
+            #logging.warning(f'No state found for source {source} creating new state')
+            self.states[source] = State()
+        return is_duplicate(request_id, message_id, self.states[source].duplicate_filter)
 
     def save_message_to_json(self, message):
+        if self.message_duplicate(message):
+            return
         self.save_message_in_memory(message)
         with FILE_LOCK:
             with open(self.path, 'a') as f:
@@ -38,6 +51,8 @@ class DataSaver:
         self.eof_data[uid] += 1
 
     def save_message_in_memory(self, message):
+        if self.message_duplicate(message):
+            return
         message['request_id'] = str(message['request_id'])
         uid = message['request_id']
         source = message['source']
