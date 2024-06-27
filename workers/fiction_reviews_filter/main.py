@@ -8,8 +8,8 @@ def update_state(old_state, message):
         # delete info that was required to process the request, which has been fulfilled
         old_state.pop(message['request_id'], None)
     else:
-        logging.warning(message['titles'][:10])
-        old_state[message['request_id']] = set(message['titles'])
+        logging.warning(message['titles'][:5])
+        old_state[message['request_id']] = [message['titles']]
     return old_state
 
 def filter_condition(state, msg):
