@@ -67,13 +67,16 @@ class ParallelWorker(Worker):
     def control_callback(self, ch, method, properties, body):
         'Callback given to a control queue to invoke for each message in the queue'
         message = json.loads(body)
+        logging.warning(f"[Control] Received message {message}")
         if message.get('type') == 'NEW_PEER' and message.get('sender_id') != self.id:
             known_peers = self.peers
             if message['sender_id'] not in self.peers:
+                logging.warning(f"[Control] Adding new peer '{message['sender_id']}'")
                 self.peers.append(message['sender_id'])
             message = {'type': 'ADD_PEERS', 'peer_ids': known_peers, 'sender_id': self.id}
             self.connection.send_message(self.peer_agora, self.peer_agora, json.dumps(message))
         elif message.get('type') == 'ADD_PEERS' and message.get('sender_id') != self.id:
+            logging.warning(f"[Control] Received peers announcement '{message['peer_ids']}'")
             self.peers += [peer for peer in message['peer_ids'] if peer not in self.peers]
         elif message.get('type') == 'EOF':
             if message['intended_recipient'] == 'BROADCAST':
@@ -81,7 +84,7 @@ class ParallelWorker(Worker):
                 message['intended_recipient'] = message['sender_id']
                 message['sender_id'] = self.id
                 self.connection.send_message(self.peer_agora, self.peer_agora, json.dumps(message))
-            elif message['intended_recipient'] == self.id and self.finished_peers:
+            elif message['intended_recipient'] == self.id and self.finished_peers.get(message['request_id']):
                 # Other workers are responding to this worker's EOF.
                 if message['sender_id'] not in self.finished_peers[message['request_id']]:
                     self.finished_peers[message['request_id']].append(message['sender_id'])
@@ -206,9 +209,6 @@ class Aggregate(Worker):
         message_id = 1
         result = self.result_fn(eof_message, self.accumulator)
         messages = json.loads(result)
-        if type(messages) != list:
-            logging.error('Result is not a list')
-            messages = [messages]
         for message in messages:
             message['message_id'] = message_id
             message_id += 1

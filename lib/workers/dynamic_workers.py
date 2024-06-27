@@ -68,6 +68,7 @@ class DynamicRouter(DynamicWorker):
         if message['request_id'] not in self.ongoing_requests:
             self.create_queues(message['request_id'])
         if message['items'] and message['items'][0].get('type') == 'EOF':
+            logging.warning(body)
             message = {'request_id': message['request_id'], 'message_id': message['message_id'], 'items': message['items'], 'type': 'EOF', 'sender_id': self.id, 'intended_recipient': 'BROADCAST'}
             self.connection.send_message(self.peer_agora, self.peer_agora, json.dumps(message))
             self.finished_peers[message['request_id']] = [self.id]
@@ -92,6 +93,7 @@ class DynamicRouter(DynamicWorker):
     def end(self, ch, method, properties, body):
         'Send EOF to next layer'
         eof_message = json.loads(body)
+        logging.warning(f'Propagating EOF to next layer for request {[eof_message["request_id"]]}')
         del eof_message['intended_recipient']
         del eof_message['sender_id']
         for routing_key in self.routing_fn(eof_message):
