@@ -54,7 +54,10 @@ class MessageBroker():
         self.channel.basic_ack(delivery_tag=message_id)
     
     def close_connection(self):
-        self.connection.close()
+        try:
+            self.connection.close()
+        except:
+            pass
     
     def wait_connection(self, host='rabbitmq', timeout=120, interval=10):
         """

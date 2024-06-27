@@ -10,7 +10,7 @@ import logging
 import signal
 
 EXCLUDED_SERVICES = ['rabbitmq', "client"]
-HEALTHCHECK_FREQUENCY = 25
+HEALTHCHECK_FREQUENCY = 15
 HEALTHCHECK_TIMEOUT = 5
 
 def signal_handler(sig, frame):
@@ -159,8 +159,10 @@ class HealthChecker:
 
 
     def check_container(self, container):
+        if container.status != 'running':
+            self.start_container(container)
         health_status = self.get_healthcheck_message(container)
-        if not health_status or container.status != 'running':
+        if not health_status:
             logging.warning(f"Restarting container {container.name}.")
             self.start_container(container)
 
