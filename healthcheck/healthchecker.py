@@ -152,6 +152,7 @@ class HealthChecker:
 
     def check_containers(self, client: docker.DockerClient, project_name):
         containers = client.containers.list(filters={"label": f"com.docker.compose.project={project_name}"}, all=True)
+        logging.warning(f"Checking containers: {containers}")
         for container in containers:
             if any(service in container.name for service in EXCLUDED_SERVICES):
                 continue
