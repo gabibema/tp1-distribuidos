@@ -42,6 +42,7 @@ class DynamicWorker(Worker):
             if routing_key:
                 routing_key = f"{routing_key}_{request_id}"
                 self.connection.link_queue(new_dst_queue, self.dst_exchange, routing_key=routing_key)
+        self.ongoing_requests.add(request_id)
 
 
 class DynamicRouter(DynamicWorker):
@@ -50,8 +51,6 @@ class DynamicRouter(DynamicWorker):
     def __init__(self, routing_fn, control_queue_prefix, *args, **kwargs):
         self.routing_fn = routing_fn
         super().new(*args, **kwargs)
-        state = load_state()
-        self.ongoing_requests = state.get("ongoing_requests", self.ongoing_requests)
         self.connection.create_control_queue(control_queue_prefix, self.control_callback)
 
     def callback(self, ch, method, properties, body):
@@ -67,7 +66,6 @@ class DynamicRouter(DynamicWorker):
             self.connection.send_message('', self.connection.next_peer, json.dumps(message))
         else:
             self.inner_callback(ch, method, properties, message)
-        save_state(ongoing_requests=self.ongoing_requests)
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
     def inner_callback(self, ch, method, properties, batch):
@@ -90,7 +88,6 @@ class DynamicRouter(DynamicWorker):
         for routing_key in self.routing_fn(eof_message):
             ch.basic_publish(exchange=self.dst_exchange, routing_key=routing_key, body=json.dumps(eof_message))
         self.ongoing_requests.discard(eof_message['request_id'])
-        save_state(ongoing_requests=self.ongoing_requests)
         # DON'T delete queues yet! messages need to be consumed.
         # queues should be deleted by consumer after reading the EOF.
 
