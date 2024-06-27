@@ -15,25 +15,18 @@ class MessageBroker():
         self.channel.queue_declare(queue=queue_name, durable=persistent)
 
     def create_control_queue(self, queue_prefix, callback):
-        self.id = str(uuid4())
-        try:
-            # Acquire leader lock.
-            self.channel.queue_declare(queue=queue_prefix + '_lock', exclusive=True)
-            # This process is the leader.
-            queue_name = queue_prefix + '_leader'
-            self.channel.queue_declare(queue=queue_name, durable=True)
-            self.next_peer = queue_name
-            self.channel.basic_consume(queue=queue_name, on_message_callback=callback)
-        except pika.exceptions.ChannelClosedByBroker:
-            # RESOURCE_LOCKED - someone else is already the leader.
-            queue_name = queue_prefix + '_' + self.id
-            # open a new channel.
-            self.channel = self.connection.channel()
-            self.channel.queue_declare(queue=queue_name, durable=True)
-            self.channel.basic_consume(queue=queue_name, on_message_callback=callback)
-            # Announce itself to the leader.
-            message = {'type': 'NEW_PEER', 'peer_name': queue_name}
-            self.send_message('', queue_prefix + '_leader', json.dumps(message))
+        save_state(id=self.id)
+        queue_name = queue_prefix + '_' + self.id
+        # open a new channel.
+        self.channel = self.connection.channel()
+        self.channel.queue_declare(queue=queue_name, durable=True)
+        self.channel.basic_consume(queue=queue_name, on_message_callback=callback)
+        # Announce itself to the peers.
+        router_name = queue_prefix
+        self.create_router(router_name, pika.exchange_type.ExchangeType.fanout)
+        self.link_queue(queue_name, router_name, router_name)
+        message = {'type': 'NEW_PEER', 'sender_id': self.id}
+        self.send_message(router_name, router_name, json.dumps(message))
 
     def create_router(self, router_name, router_type):
         self.channel.exchange_declare(exchange=router_name, exchange_type=router_type)

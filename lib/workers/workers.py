@@ -50,35 +50,50 @@ class Worker(ABC):
 class ParallelWorker(Worker):
     def new(self, control_queue_prefix, *args, **kwargs):
         super().new(*args, **kwargs)
+        state = load_state()
+        self.id = state.get('id', str(uuid4()))
+        self.peers = state.get('peers', set(self.id))
+        self.finished_peers = state.get('finished_peers', set())
+        self.peer_agora = control_queue_prefix
         self.connection.create_control_queue(control_queue_prefix, self.control_callback)
 
     def control_callback(self, ch, method, properties, body):
         'Callback given to a control queue to invoke for each message in the queue'
         message = json.loads(body)
+        if message['sender_id'] == self.id:
+            self.connection.acknowledge_message(method.delivery_tag)
+            return
         if message.get('type') == 'NEW_PEER':
-            # Insert peer in linked list, between self and the next peer.
-            old_next_peer = self.connection.next_peer
-            self.connection.next_peer = message['peer_name']
-            # Tell the new peer who their next peer is.
-            message = {'type': 'SET_NEXT_PEER', 'peer_name': old_next_peer}
-            self.connection.send_message('', self.connection.next_peer, json.dumps(message))
-        elif message.get('type') == 'SET_NEXT_PEER':
-            self.connection.next_peer = message['peer_name']
+            known_peers = list(self.peers)
+            self.peers.add(message['sender_id'])
+            message = {'type': 'ADD_PEERS', 'peer_ids': known_peers, 'sender_id': self.id}
+            self.connection.send_message(self.peer_agora, self.peer_agora, json.dumps(message))
+        elif message.get('type') == 'ADD_PEERS':
+            self.peers.update(message['peer_ids'])
             # Worker is ready to process incoming messages, subscribe it to work queue.
             self.connection.set_consumer(self.src_queue, self.callback)
         elif message.get('type') == 'EOF':
-            if message['intended_recipient'] == self.connection.id:
-                self.end(ch, method, properties, body)
-            else:
-                self.connection.send_message('', self.connection.next_peer, body)
+            if message['intended_recipient'] == 'BROADCAST':
+                # EOF was received by another worker and is expecting an answer.
+                message['intended_recipient'] = message['sender_id']
+                message['sender_id'] = self.id
+                self.connection.send_message('', self.connection.next_peer, json.dumps(message))
+            elif message['intended_recipient'] == self.id and self.finished_peers:
+                # Other workers are responding to this worker's EOF.
+                self.finished_peers.add(message['sender_id'])
+                if self.finished_peers == self.peers:
+                    self.finished_peers = set()
+                    self.end(ch, method, properties, body)
         else:
             logging.error(f"Unhandled message with unknown 'type': {json.dumps(message)}")
+        save_state(id=self.id, peers=self.peers, finished_peers=self.finished_peers)
         self.connection.acknowledge_message(method.delivery_tag)
 
     def end(self, ch, method, properties, body):
         'Send EOF to next layer'
         eof_message = json.loads(body)
         del eof_message['intended_recipient']
+        del eof_message['sender_id']
         self.connection.send_message(self.dst_exchange, self.routing_key, json.dumps(eof_message))
 
 
@@ -92,8 +107,10 @@ class Filter(ParallelWorker):
         batch = json.loads(body)
         if batch['items'] and batch['items'][0].get('type') == 'EOF':
             logging.warning(batch)
-            message = {'request_id': batch['request_id'], 'message_id': batch['message_id'], 'type': 'EOF', 'items': batch['items'], 'intended_recipient': self.connection.id}
+            message = {'request_id': batch['request_id'], 'message_id': batch['message_id'], 'type': 'EOF', 'items': batch['items'], 'sender_id': self.id, 'intended_recipient': self.connection.id}
             self.connection.send_message('', self.connection.next_peer, json.dumps(message))
+            self.finished_peers.add(self.id)
+            save_state(id=self.id, peers=self.peers, finished_peers=self.finished_peers)
         else:
             batch['items'] = [msg for msg in batch['items'] if self.filter_condition(json.dumps(msg))]
             self.connection.send_message(self.dst_exchange, self.routing_key, json.dumps(batch))
@@ -110,8 +127,10 @@ class Map(ParallelWorker):
         batch = json.loads(body)
         if batch['items'] and batch['items'][0].get('type') == 'EOF':
             logging.warning(batch)
-            message = {'request_id': batch['request_id'], 'message_id': batch['message_id'], 'type': 'EOF', 'items': batch['items'], 'intended_recipient': self.connection.id}
+            message = {'request_id': batch['request_id'], 'message_id': batch['message_id'], 'type': 'EOF', 'items': batch['items'], 'sender_id': self.id, 'intended_recipient': self.connection.id}
             self.connection.send_message('', self.connection.next_peer, json.dumps(message))
+            self.finished_peers.add(self.id)
+            save_state(id=self.id, peers=self.peers, finished_peers=self.finished_peers)
         else:
             mapped_messages = [self.map_fn(item) for item in batch['items']]
             message = {'request_id': batch['request_id'], 'message_id': batch['message_id'], 'items': mapped_messages}
@@ -129,8 +148,10 @@ class Router(ParallelWorker):
         batch = json.loads(body)
         if batch['items'] and batch['items'][0].get('type') == 'EOF':
             logging.warning(batch)
-            message = {'request_id': batch['request_id'], 'message_id': batch['message_id'], 'type': 'EOF', 'items': batch['items'], 'intended_recipient': self.connection.id}
+            message = {'request_id': batch['request_id'], 'message_id': batch['message_id'], 'type': 'EOF', 'items': batch['items'], 'sender_id': self.id, 'intended_recipient': self.connection.id}
             self.connection.send_message('', self.connection.next_peer, json.dumps(message))
+            self.finished_peers.add(self.id)
+            save_state(id=self.id, peers=self.peers, finished_peers=self.finished_peers)
         else:
             messages_per_target = {}
             for msg in batch['items']:
