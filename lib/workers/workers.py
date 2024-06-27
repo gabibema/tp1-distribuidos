@@ -67,7 +67,7 @@ class ParallelWorker(Worker):
     def control_callback(self, ch, method, properties, body):
         'Callback given to a control queue to invoke for each message in the queue'
         message = json.loads(body)
-        logging.warning(f"[Control] Received message {message}")
+        logging.info(f"[Control] Received message {message}")
         if message.get('type') == 'NEW_PEER' and message.get('sender_id') != self.id:
             known_peers = self.peers
             if message['sender_id'] not in self.peers:
@@ -88,7 +88,7 @@ class ParallelWorker(Worker):
                 # Other workers are responding to this worker's EOF.
                 if message['sender_id'] not in self.finished_peers[message['request_id']]:
                     self.finished_peers[message['request_id']].append(message['sender_id'])
-                if self.finished_peers[message['request_id']] == self.peers:
+                if set(self.finished_peers[message['request_id']]) == set(self.peers):
                     del self.finished_peers[message['request_id']]
                     self.end(ch, method, properties, body)
         save_state(id=self.id, peers=self.peers, finished_peers=self.finished_peers)
