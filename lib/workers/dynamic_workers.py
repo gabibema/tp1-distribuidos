@@ -70,6 +70,8 @@ class DynamicRouter(DynamicWorker):
         if message['items'] and message['items'][0].get('type') == 'EOF':
             message = {'request_id': message['request_id'], 'message_id': message['message_id'], 'items': message['items'], 'type': 'EOF', 'sender_id': self.id, 'intended_recipient': 'BROADCAST'}
             self.connection.send_message(self.peer_agora, self.peer_agora, json.dumps(message))
+            self.finished_peers[message['request_id']] = [self.id]
+            save_state(id=self.id, peers=self.peers, finished_peers=self.finished_peers)
         else:
             self.inner_callback(ch, method, properties, message)
         ch.basic_ack(delivery_tag=method.delivery_tag)
