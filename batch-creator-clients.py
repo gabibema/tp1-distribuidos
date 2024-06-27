@@ -45,7 +45,7 @@ merged_df = pd.merge(books_df, ratings_df, on='Title', how='inner')
 num_splits = len(output_dirs)
 
 total_size = len(merged_df)
-split_sizes = np.random.randint(1, 101, size=num_splits)
+split_sizes = np.random.randint(80, 101, size=num_splits)
 split_sizes = (split_sizes / 100) * total_size
 split_sizes = split_sizes.astype(int)
 
