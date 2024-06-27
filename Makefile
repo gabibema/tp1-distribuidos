@@ -46,6 +46,7 @@ docker-compose-client: docker-image-client
 docker-compose-down:
 	docker compose -f docker-compose-dev.yaml stop -t 1
 	docker compose -f docker-compose-dev.yaml down
+	docker volume rm $$(docker volume ls -q | grep tp1-distribuidos)
 	rm -r gateway/backup || true
 .PHONY: docker-compose-down
 

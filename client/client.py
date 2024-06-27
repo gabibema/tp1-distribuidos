@@ -54,7 +54,7 @@ class Client:
         except TimeoutError:
             cliend_error = True
         except Exception as e:
-            pass
+            raise e
         finally:
             self.conn.close()
             for sender in self.senders:
@@ -104,7 +104,7 @@ class Client:
             start_id = self.checkpoint[source]["message_id"]
             eof = self.checkpoint[source]["eof"]
         if eof:
-            #logging.warning(f'Skipping file {path} due to EOF')
+            logging.warning(f'Skipping file {path} due to EOF')
             return
 
         with open(path, READ_MODE) as file:
@@ -129,6 +129,7 @@ class Client:
 
         if len(batch) > 1:
             batch[-1] = batch[-1].rstrip()
+            message_id += 1
             queue.put((message_id, ''.join(batch)))
 
         batch = ['type', 'EOF']

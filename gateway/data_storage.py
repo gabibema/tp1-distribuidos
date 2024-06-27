@@ -3,7 +3,7 @@ import io
 import json
 import logging
 from multiprocessing import Manager, Lock
-from lib.fault_tolerance import State, is_duplicate
+from lib.fault_tolerance import is_duplicate
 
 FILE_LOCK = Lock()
 LATEST_ROW = 0
@@ -31,8 +31,8 @@ class DataSaver:
         source = message['source']
         if not self.states.get(source):
             #logging.warning(f'No state found for source {source} creating new state')
-            self.states[source] = State()
-        return is_duplicate(request_id, message_id, self.states[source].duplicate_filter)
+            self.states[source] = {}
+        return is_duplicate(request_id, message_id, self.states[source])
 
     def save_message_to_json(self, message):
         if self.message_duplicate(message):
@@ -90,11 +90,7 @@ class DataSaver:
                             continue
                         self.save_message_in_memory(message)
                     except json.JSONDecodeError as e:
-                        logging.error(f'Error while decoding JSON from message: {msg}\nError: {e}')
-            # except FileNotFoundError:
-            #     logging.warning(f'File not found: {self.path}')
-            # except json.JSONDecodeError:
-            #     logging.error(f'Error while decoding JSON from file: {self.path}')
+                        pass
 
     def get(self, uid):
         uid = str(uid)

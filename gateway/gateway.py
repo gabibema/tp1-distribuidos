@@ -12,7 +12,6 @@ from lib.gateway import BookPublisher, ResultReceiver, ReviewPublisher, MAX_KEY_
 from lib.transfer.transfer_protocol import MESSAGE_FLAG, MessageTransferProtocol, RouterProtocol
 from lib.workers.workers import wait_rabbitmq
 from lib.healthcheck import Healthcheck, HEALTH
-from os.path import exists
 
 CLIENTS_BACKLOG = 5
 RESULTS_BACKLOG = 5

@@ -10,7 +10,7 @@ import logging
 import signal
 
 EXCLUDED_SERVICES = ['rabbitmq', "client"]
-HEALTHCHECK_FREQUENCY = 15
+HEALTHCHECK_FREQUENCY = 5
 HEALTHCHECK_TIMEOUT = 5
 
 def signal_handler(sig, frame):
@@ -60,7 +60,7 @@ class Bully:
     def __init_connection(self):
         connection = MessageBroker(self.hostname)
         connection.create_router("health_bully", ExchangeType.fanout)
-        result = connection.create_queue("", False)
+        result = connection.create_queue("", False, True)
         connection.link_queue(result.method.queue, "health_bully")
 
         connection_sender = MessageBroker(self.hostname)
@@ -137,9 +137,9 @@ class HealthChecker:
             self.checker.join()
 
     def __healthcheck(self):
+        client = docker.DockerClient()
         try:
             self.bully_leader_event.wait()
-            client = docker.DockerClient()
             logging.warning(f"Healthchecker started with id: {self.bully.id.value}")
             while True:
                 sleep(HEALTHCHECK_FREQUENCY)
@@ -159,8 +159,8 @@ class HealthChecker:
 
 
     def check_container(self, container):
-        logging.warning(f"Checking container {container.name} with status {container.status}.")
         if container.status != 'running':
+            logging.warning(f"Restarting container {container.name}.")
             self.start_container(container)
         health_status = self.get_healthcheck_message(container)
         if not health_status:

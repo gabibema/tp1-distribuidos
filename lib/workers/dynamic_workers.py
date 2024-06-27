@@ -1,8 +1,9 @@
 import json
 import logging
+from uuid import uuid4
 from abc import abstractmethod
 from .workers import Worker, ParallelWorker
-from lib.fault_tolerance import State, is_repeated
+from lib.fault_tolerance import save_state, load_state, is_repeated
 
 class DynamicWorker(Worker):
     """
@@ -42,6 +43,7 @@ class DynamicWorker(Worker):
             if routing_key:
                 routing_key = f"{routing_key}_{request_id}"
                 self.connection.link_queue(new_dst_queue, self.dst_exchange, routing_key=routing_key)
+        self.ongoing_requests.add(request_id)
 
 
 class DynamicRouter(DynamicWorker):
@@ -50,7 +52,12 @@ class DynamicRouter(DynamicWorker):
     def __init__(self, routing_fn, control_queue_prefix, *args, **kwargs):
         self.routing_fn = routing_fn
         super().new(*args, **kwargs)
-        self.connection.create_control_queue(control_queue_prefix, self.control_callback)
+        state = load_state()
+        self.id = state.get('id', str(uuid4()))
+        self.peers = state.get('peers', [self.id])
+        self.finished_peers = state.get('finished_peers', {})
+        self.peer_agora = control_queue_prefix
+        self.connection.create_control_queue(control_queue_prefix, self.control_callback, self.src_queue, self.callback, self.id)
 
     def callback(self, ch, method, properties, body):
         """
@@ -61,8 +68,11 @@ class DynamicRouter(DynamicWorker):
         if message['request_id'] not in self.ongoing_requests:
             self.create_queues(message['request_id'])
         if message['items'] and message['items'][0].get('type') == 'EOF':
-            message = {'request_id': message['request_id'], 'message_id': message['message_id'], 'items': message['items'], 'type': 'EOF', 'intended_recipient': self.connection.id}
-            self.connection.send_message('', self.connection.next_peer, json.dumps(message))
+            logging.warning(body)
+            message = {'request_id': message['request_id'], 'message_id': message['message_id'], 'items': message['items'], 'type': 'EOF', 'sender_id': self.id, 'intended_recipient': 'BROADCAST'}
+            self.connection.send_message(self.peer_agora, self.peer_agora, json.dumps(message))
+            self.finished_peers[message['request_id']] = [self.id]
+            save_state(id=self.id, peers=self.peers, finished_peers=self.finished_peers)
         else:
             self.inner_callback(ch, method, properties, message)
         ch.basic_ack(delivery_tag=method.delivery_tag)
@@ -83,7 +93,9 @@ class DynamicRouter(DynamicWorker):
     def end(self, ch, method, properties, body):
         'Send EOF to next layer'
         eof_message = json.loads(body)
+        logging.warning(f'Propagating EOF to next layer for request {[eof_message["request_id"]]}')
         del eof_message['intended_recipient']
+        del eof_message['sender_id']
         for routing_key in self.routing_fn(eof_message):
             ch.basic_publish(exchange=self.dst_exchange, routing_key=routing_key, body=json.dumps(eof_message))
         self.ongoing_requests.discard(eof_message['request_id'])
@@ -95,8 +107,8 @@ class DynamicAggregate(DynamicWorker):
     def __init__(self, aggregate_fn, result_fn, accumulator, *args, **kwargs):
         self.aggregate_fn = aggregate_fn
         self.result_fn = result_fn
-        self.accumulator = accumulator
-        self.message_id_per_request = {}
+        state = load_state()
+        self.accumulator = state.get("accumulator", accumulator)
         super().new(*args, **kwargs)
 
     def inner_callback(self, ch, method, properties, msg):
@@ -106,18 +118,18 @@ class DynamicAggregate(DynamicWorker):
             self.end(msg)
         else:
             self.aggregate_fn(msg, self.accumulator)
+        save_state(accumulator=self.accumulator)
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
     def end(self, eof_message):
-        self.message_id_per_request[eof_message['request_id']] = self.message_id_per_request.get(eof_message['request_id'], 1)
+        message_id = 1
         messages = self.result_fn(eof_message, self.accumulator)
         for msg in messages:
-            msg['message_id'] = self.message_id_per_request[msg['request_id']]
-            self.message_id_per_request[msg['request_id']] += 1
+            msg['message_id'] = message_id
+            message_id += 1
             routing_key = f"{self.routing_key}_{msg['request_id']}"
             self.connection.send_message(self.dst_exchange, routing_key, json.dumps(msg))
-        eof_message['message_id'] = self.message_id_per_request[msg['request_id']]
-        self.message_id_per_request[msg['request_id']] += 1
+        eof_message['message_id'] = message_id
         routing_key = f"{self.routing_key}_{eof_message['request_id']}"
         self.connection.send_message(self.dst_exchange, routing_key, json.dumps(eof_message))
 
@@ -128,18 +140,19 @@ class DynamicFilter(Worker):
     Subscribes to a queue where different filter conditions are announced for each request,
     and subscribes to the request specific queues when that condition arrives.
     """
-    def __init__(self, update_state, filter_condition, tmp_queues_prefix, *args, **kwargs):
+    def __init__(self, update_state, filter_condition, tmp_queues_prefix, connection, *args, **kwargs):
         self.update_state = update_state
         self.filter_condition = filter_condition
         self.tmp_queues_prefix = tmp_queues_prefix
-        self.filter_state = {}
-        self.duplicates_state = {}
-        super().new(*args, **kwargs)
+        self.connection = connection
+        self.recover_from_state(load_state())
+        super().new(connection, *args, **kwargs)
 
     def callback(self, ch, method, properties, body):
         'Callback used to update the internal state, to change how future messages are filtered'
         msg = json.loads(body)
         if is_repeated(msg['request_id'], msg['message_id'], self.duplicates_state):
+            # There's no need to update state for duplicate messages.
             ch.basic_ack(delivery_tag=method.delivery_tag)
             return
         # Ignore EOFs through this queue. Each client will send their EOF through the tmp queue.
@@ -149,6 +162,7 @@ class DynamicFilter(Worker):
             new_tmp_queue = f"{self.tmp_queues_prefix}_{msg['request_id']}_queue"
             self.connection.create_queue(new_tmp_queue, persistent=True)
             self.connection.set_consumer(new_tmp_queue, self.filter_callback)
+            save_state(filter_state=self.filter_state, duplicates_state=self.duplicates_state)
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
     def client_EOF(self, body):
@@ -157,6 +171,7 @@ class DynamicFilter(Worker):
         self.filter_state = self.update_state(self.filter_state, msg)
         tmp_queue = f"{self.tmp_queues_prefix}_{msg['request_id']}_queue"
         self.connection.channel.queue_delete(queue=tmp_queue)
+        save_state(filter_state=self.filter_state, duplicates_state=self.duplicates_state)
 
     def filter_callback(self, ch, method, properties, body):
         'Callback used to filter messages in a queue'
@@ -174,3 +189,11 @@ class DynamicFilter(Worker):
             batch['items'] = filtered_messages
             self.connection.send_message(self.dst_exchange, self.routing_key, json.dumps(batch))
         ch.basic_ack(delivery_tag=method.delivery_tag)
+
+    def recover_from_state(self, state):
+        self.duplicates_state = state.get("duplicates_state", {})
+        self.filter_state = state.get("filter_state", {})
+        for request_id in self.filter_state:
+            new_tmp_queue = f"{self.tmp_queues_prefix}_{msg['request_id']}_queue"
+            self.connection.create_queue(new_tmp_queue, persistent=True)
+            self.connection.set_consumer(new_tmp_queue, self.filter_callback)

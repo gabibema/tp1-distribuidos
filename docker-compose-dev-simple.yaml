@@ -101,30 +101,6 @@ services:
     links:
       - rabbitmq
 
-  fiction_category_filter-2:
-    container_name: fiction_category_filter-2
-    image: fiction_category_filter:latest
-    entrypoint: python3 /app/main.py
-    volumes:
-      - fiction_category_filter-2:/var
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-    links:
-      - rabbitmq
-
-  fiction_category_filter-3:
-    container_name: fiction_category_filter-3
-    image: fiction_category_filter:latest
-    entrypoint: python3 /app/main.py
-    volumes:
-      - fiction_category_filter-3:/var
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-    links:
-      - rabbitmq
-
   fiction_avg_nlp_by_title-1:
     container_name: fiction_avg_nlp_by_title-1
     image: fiction_avg_nlp_by_title:latest
@@ -256,48 +232,12 @@ services:
     links:
       - rabbitmq
 
-  title_sharder-2:
-    container_name: title_sharder-2
-    image: title_sharder:latest
-    entrypoint: python3 /app/main.py
-    volumes:
-      - title_sharder-2:/var
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-    links:
-      - rabbitmq
-
-  title_sharder-3:
-    container_name: title_sharder-3
-    image: title_sharder:latest
-    entrypoint: python3 /app/main.py
-    volumes:
-      - title_sharder-3:/var
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-    links:
-      - rabbitmq
-
   90s_title_sharder-1:
     container_name: 90s_title_sharder-1
     image: 90s_title_sharder:latest
     entrypoint: python3 /app/main.py
     volumes:
       - 90s_title_sharder-1:/var
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-    links:
-      - rabbitmq
-
-  90s_title_sharder-2:
-    container_name: 90s_title_sharder-2
-    image: 90s_title_sharder:latest
-    entrypoint: python3 /app/main.py
-    volumes:
-      - 90s_title_sharder-2:/var
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -328,18 +268,6 @@ services:
     links:
       - rabbitmq
 
-  fiction_review_nlp-2:
-    container_name: fiction_review_nlp-2
-    image: fiction_review_nlp:latest
-    entrypoint: python3 /app/main.py
-    volumes:
-      - fiction_review_nlp-2:/var
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-    links:
-      - rabbitmq
-
   fiction_title_sharder-1:
     container_name: fiction_title_sharder-1
     image: fiction_title_sharder:latest
@@ -364,18 +292,6 @@ services:
     links:
       - rabbitmq
 
-  90s_reviews_filter-2:
-    container_name: 90s_reviews_filter-2
-    image: 90s_reviews_filter:latest
-    entrypoint: python3 /app/main.py
-    volumes:
-      - 90s_reviews_filter-2:/var
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-    links:
-      - rabbitmq
-
   fiction_percentile_filter-1:
     container_name: fiction_percentile_filter-1
     image: fiction_percentile_filter:latest
@@ -391,9 +307,7 @@ services:
 volumes:
   gateway:
   count_90s_revs_by_title-1:
-  fiction_category_filter-1: # Filter
-  fiction_category_filter-2: # Filter
-  fiction_category_filter-3: # Filter
+  fiction_category_filter-1:
   fiction_title_barrier-1:
   90s_top10_filter-1:
   fiction_reviews_filter-1:
@@ -402,15 +316,12 @@ volumes:
   computer_books_filter-1:
   author_decades_filter-1:
   fiction_percentile_calculator-1:
-  title_sharder-1: # DynamicRouter
-  title_sharder-2: # DynamicRouter
-  title_sharder-3: # DynamicRouter
-  90s_title_sharder-1:  # Router
-  90s_title_sharder-2:  # Router
+  title_sharder-1:
+  title_sharder-2:
+  title_sharder-3:
+  90s_title_sharder-1:
   author_sharder-1:
-  fiction_review_nlp-1: # Map
-  fiction_review_nlp-2: # Map
+  fiction_review_nlp-1:
   fiction_title_sharder-1:
-  90s_reviews_filter-1: # DynamicFilter
-  90s_reviews_filter-2: # DynamicFilter
+  90s_reviews_filter-1:
   fiction_percentile_filter-1:

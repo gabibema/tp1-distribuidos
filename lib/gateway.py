@@ -2,7 +2,6 @@ from io import StringIO
 from csv import DictReader
 import logging
 import json
-import uuid
 
 from lib.transfer.transfer_protocol import MESSAGE_FLAG
 
