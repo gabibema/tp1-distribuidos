@@ -1,8 +1,9 @@
 import json
 import logging
+from uuid import uuid4
 from abc import abstractmethod
 from .workers import Worker, ParallelWorker
-from lib.fault_tolerance import DumbDuplicateFilterState, is_repeated
+from lib.fault_tolerance import DumbDuplicateFilterState, save_state, load_state
 
 class DynamicWorker(Worker):
     """
@@ -51,7 +52,12 @@ class DynamicRouter(DynamicWorker):
     def __init__(self, routing_fn, control_queue_prefix, *args, **kwargs):
         self.routing_fn = routing_fn
         super().new(*args, **kwargs)
-        self.connection.create_control_queue(control_queue_prefix, self.control_callback)
+        state = load_state()
+        self.id = state.get('id', str(uuid4()))
+        self.peers = state.get('peers', set(self.id))
+        self.finished_peers = state.get('finished_peers', set())
+        self.peer_agora = control_queue_prefix
+        self.connection.create_control_queue(control_queue_prefix, self.control_callback, self.id)
 
     def callback(self, ch, method, properties, body):
         """

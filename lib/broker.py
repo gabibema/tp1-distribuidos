@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 from time import sleep, time
-from uuid import uuid4
 import json
 import pika
+from lib.fault_tolerance import save_state
 
 class MessageBroker():
     def __init__(self, hostname):
@@ -14,9 +14,9 @@ class MessageBroker():
     def create_queue(self, queue_name, persistent):
         self.channel.queue_declare(queue=queue_name, durable=persistent)
 
-    def create_control_queue(self, queue_prefix, callback):
-        save_state(id=self.id)
-        queue_name = queue_prefix + '_' + self.id
+    def create_control_queue(self, queue_prefix, callback, worker_id):
+        save_state(id=worker_id)
+        queue_name = queue_prefix + '_' + worker_id
         # open a new channel.
         self.channel = self.connection.channel()
         self.channel.queue_declare(queue=queue_name, durable=True)
@@ -25,7 +25,7 @@ class MessageBroker():
         router_name = queue_prefix
         self.create_router(router_name, pika.exchange_type.ExchangeType.fanout)
         self.link_queue(queue_name, router_name, router_name)
-        message = {'type': 'NEW_PEER', 'sender_id': self.id}
+        message = {'type': 'NEW_PEER', 'sender_id': worker_id}
         self.send_message(router_name, router_name, json.dumps(message))
 
     def create_router(self, router_name, router_type):

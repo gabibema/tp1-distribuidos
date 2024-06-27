@@ -1,10 +1,11 @@
 from abc import ABC, abstractmethod
 from time import sleep, time
+from uuid import uuid4
 import json
 import logging
 import pika
 from pika.exchange_type import ExchangeType
-from lib.fault_tolerance import DuplicateFilterState, is_duplicate, save_state, load_state
+from lib.fault_tolerance import DuplicateFilterState, save_state, load_state
 
 WAIT_TIME_PIKA=5
 
@@ -52,10 +53,10 @@ class ParallelWorker(Worker):
         super().new(*args, **kwargs)
         state = load_state()
         self.id = state.get('id', str(uuid4()))
-        self.peers = state.get('peers', set(self.id))
-        self.finished_peers = state.get('finished_peers', set())
+        self.peers = set(state.get('peers', self.id))
+        self.finished_peers = set(state.get('finished_peers', []))
         self.peer_agora = control_queue_prefix
-        self.connection.create_control_queue(control_queue_prefix, self.control_callback)
+        self.connection.create_control_queue(control_queue_prefix, self.control_callback, self.id)
 
     def control_callback(self, ch, method, properties, body):
         'Callback given to a control queue to invoke for each message in the queue'
@@ -86,7 +87,7 @@ class ParallelWorker(Worker):
                     self.end(ch, method, properties, body)
         else:
             logging.error(f"Unhandled message with unknown 'type': {json.dumps(message)}")
-        save_state(id=self.id, peers=self.peers, finished_peers=self.finished_peers)
+        save_state(id=self.id, peers=list(self.peers), finished_peers=list(self.finished_peers))
         self.connection.acknowledge_message(method.delivery_tag)
 
     def end(self, ch, method, properties, body):
