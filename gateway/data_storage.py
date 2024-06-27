@@ -58,6 +58,7 @@ class DataSaver:
         source = message['source']
         self.__create_if_not_exists(uid)
         if message.get('eof', False):
+            logging.warning(f'EOF message received from {source} with request_id {uid}')
             self.save_eof(uid, source)
 
         if self.mode == ALL_ROWS:
