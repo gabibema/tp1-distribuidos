@@ -10,7 +10,7 @@ import logging
 import signal
 
 EXCLUDED_SERVICES = ['rabbitmq', "client"]
-HEALTHCHECK_FREQUENCY = 15
+HEALTHCHECK_FREQUENCY = 10
 HEALTHCHECK_TIMEOUT = 5
 
 def signal_handler(sig, frame):
