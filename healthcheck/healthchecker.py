@@ -137,9 +137,9 @@ class HealthChecker:
             self.checker.join()
 
     def __healthcheck(self):
+        client = docker.DockerClient()
         try:
             self.bully_leader_event.wait()
-            client = docker.DockerClient()
             logging.warning(f"Healthchecker started with id: {self.bully.id.value}")
             while True:
                 sleep(HEALTHCHECK_FREQUENCY)

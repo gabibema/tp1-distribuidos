@@ -12,9 +12,9 @@ services:
     volumes:
       - ./config/client.ini:/app/config.ini
       - ./lib:/app/lib
-      - ./data/4df35591-4ad9-45ef-9ed0-8cc9cf99fe3a:/app/data
+      - ./data/b68763cb-a531-4f01-b7e8-ed8d571a24e3:/app/data
     environment:
-      - CLIENT_ID=4df35591-4ad9-45ef-9ed0-8cc9cf99fe3a
+      - CLIENT_ID=b68763cb-a531-4f01-b7e8-ed8d571a24e3
       - OUTPUT_DIR=/app/data/results
     networks:
       - default
