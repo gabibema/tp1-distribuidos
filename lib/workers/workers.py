@@ -61,17 +61,13 @@ class ParallelWorker(Worker):
     def control_callback(self, ch, method, properties, body):
         'Callback given to a control queue to invoke for each message in the queue'
         message = json.loads(body)
-        if message.get('sender_id') == self.id:
-            self.connection.acknowledge_message(method.delivery_tag)
-            return
-
-        if message.get('type') == 'NEW_PEER':
+        if message.get('type') == 'NEW_PEER' and message.get('sender_id') != self.id:
             known_peers = self.peers
             if message['sender_id'] not in self.peers:
                 self.peers.append(message['sender_id'])
             message = {'type': 'ADD_PEERS', 'peer_ids': known_peers, 'sender_id': self.id}
             self.connection.send_message(self.peer_agora, self.peer_agora, json.dumps(message))
-        elif message.get('type') == 'ADD_PEERS':
+        elif message.get('type') == 'ADD_PEERS' and message.get('sender_id') != self.id:
             self.peers += [peer for peer in message['peer_ids'] if peer not in self.peers]
         elif message.get('type') == 'EOF':
             if message['intended_recipient'] == 'BROADCAST':
@@ -79,14 +75,13 @@ class ParallelWorker(Worker):
                 message['intended_recipient'] = message['sender_id']
                 message['sender_id'] = self.id
                 self.connection.send_message(self.peer_agora, self.peer_agora, json.dumps(message))
-            elif message['intended_recipient'] == self.id and self.finished_peers and message['sender_id'] not in self.finished_peers:
-                # New workers are responding to this worker's EOF.
-                self.finished_peers[message['request_id']].append(message['sender_id'])
+            elif message['intended_recipient'] == self.id and self.finished_peers:
+                # Other workers are responding to this worker's EOF.
+                if message['sender_id'] not in self.finished_peers[message['request_id']]:
+                    self.finished_peers[message['request_id']].append(message['sender_id'])
                 if self.finished_peers[message['request_id']] == self.peers:
                     del self.finished_peers[message['request_id']]
                     self.end(ch, method, properties, body)
-        else:
-            logging.error(f"Unhandled message with unknown 'type': {json.dumps(message)}")
         save_state(id=self.id, peers=self.peers, finished_peers=self.finished_peers)
         self.connection.acknowledge_message(method.delivery_tag)
 
