@@ -24,7 +24,7 @@ def main():
     dst_routing_key = 'top_fiction_books'
     tmp_queues_prefix = 'avg_nlp'
     connection = MessageBroker(rabbit_hostname)
-    worker = DynamicFilter(update_state, filter_condition, tmp_queues_prefix, connection=connection, src_queue=src_queue, src_exchange=src_exchange, src_routing_key=src_routing_key, dst_routing_key=dst_routing_key)
+    worker = DynamicFilter(update_state, filter_condition, tmp_queues_prefix, connection=connection, src_queue=src_queue, src_exchange=src_exchange, src_exchange_type=ExchangeType.fanout, src_routing_key=src_routing_key, dst_routing_key=dst_routing_key)
     worker.start()
 
 if __name__ == '__main__':
