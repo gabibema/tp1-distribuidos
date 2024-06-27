@@ -21,7 +21,7 @@ source_mapping = {
     "popular_90s_books": {"headers": ["Title", "count"], "key": "items"},
     "top_90s_books": {"headers": ["Title", "count"], "key": "top10"},
     "top_fiction_books": {"headers": ["Title", "average"], "key": "items"},
-    "computer_books": {"headers": [], "key": "items"}
+    "computer_books": {"headers": ["Title"], "key": "items"}
 }
 
 

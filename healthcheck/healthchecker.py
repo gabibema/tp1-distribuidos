@@ -159,6 +159,7 @@ class HealthChecker:
 
 
     def check_container(self, container):
+        logging.warning(f"Checking container {container.name} with status {container.status}.")
         if container.status != 'running':
             self.start_container(container)
         health_status = self.get_healthcheck_message(container)
