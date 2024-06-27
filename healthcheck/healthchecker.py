@@ -11,6 +11,7 @@ import signal
 
 EXCLUDED_SERVICES = ['rabbitmq', "client"]
 HEALTHCHECK_FREQUENCY = 25
+HEALTHCHECK_TIMEOUT = 5
 
 def signal_handler(sig, frame):
     logging.warning(f"System shutdown received {sig}.")
@@ -83,7 +84,7 @@ class Bully:
         try:
             while True:
                 connection.send_message("health_bully", "", str(self.id.value))
-                sleep(5)
+                sleep(HEALTHCHECK_TIMEOUT)
                 peers = list(self.stored_peers.get_peers())
 
                 if self.__is_new_leader(peers):
@@ -159,27 +160,23 @@ class HealthChecker:
 
     def check_container(self, container):
         health_status = self.get_healthcheck_message(container)
-        #logging.warning(f"Healthcheck response for container {container.name}: {health_status}")
         if not health_status or container.status != 'running':
-            logging.warning(f"Restarting container {container.name}")
+            logging.warning(f"Restarting container {container.name}.")
             self.start_container(container)
 
     def start_container(self, container):
         try:
-            if container.status == 'running':
-                container.kill()
-            container.start()
-            logging.info(f"Container {container.name} started successfully.")
+            container.restart(timeout=1)
         except Exception as e:
             logging.error(f"Failed to start container {container.name}: {str(e)}")
 
     def get_healthcheck_message(self, container):
         try:
             ip_address = container.attrs['NetworkSettings']['Networks']['tp1-distribuidos_default']['IPAddress']
-
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.settimeout(HEALTHCHECK_TIMEOUT)
                 s.connect((ip_address, HEALTHCHECK_PORT))
-                response = s.recv(1)
+                response = s.recv(1, )
                 return int.from_bytes(response, byteorder='big')
         except Exception as e:
             logging.error(f"Error connecting to container {container.name}: {str(e)}")
