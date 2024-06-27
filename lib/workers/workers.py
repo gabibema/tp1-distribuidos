@@ -2,6 +2,9 @@ from abc import ABC, abstractmethod
 from time import sleep, time
 import json
 import logging
+from multiprocessing import Process
+from pika.exchange_type import ExchangeType
+from lib.healthcheck import Healthcheck, HEALTH
 import pika
 from pika.exchange_type import ExchangeType
 from lib.fault_tolerance import State, is_duplicate
@@ -32,6 +35,8 @@ class Worker(ABC):
         if dst_exchange:
             self.connection.create_router(dst_exchange, dst_exchange_type)
         self.routing_key = dst_routing_key
+        self.healthcheck = Process(target=Healthcheck().listen_healthchecks)
+        self.health = HEALTH
 
     @abstractmethod
     def callback(self, ch, method, properties, body):
@@ -39,6 +44,7 @@ class Worker(ABC):
         pass
 
     def start(self):
+        self.healthcheck.start()
         self.connection.set_consumer(self.src_queue, self.callback)
         self.connection.begin_consuming()
 

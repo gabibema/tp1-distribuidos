@@ -42,8 +42,11 @@ def main():
     initialize_log(config_params['log_level'])
     initialize_dir(config_params['output_dir'])
 
-    client = Client(config_params)
-    client.start()
+    client_timeout = True
+    while client_timeout:
+        client = Client(config_params)
+        client_timeout = client.start()
+
 
 
 

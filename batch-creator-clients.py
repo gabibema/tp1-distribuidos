@@ -26,7 +26,16 @@ def extract_client_ids(file_path):
 
     return client_ids
 
-# Obtener los CLIENT_ID no comentados
+def get_random_start_position(total_size, split_size):
+    position = np.random.choice(['start', 'end', 'middle'])
+    if position == 'start':
+        start_idx = 0
+    elif position == 'end':
+        start_idx = total_size - split_size
+    elif position == 'middle':
+        start_idx = np.random.randint(0, total_size - split_size + 1)
+    return start_idx
+
 client_ids = extract_client_ids(file_path)
 output_dirs = [f'./data/{client_id}' for client_id in client_ids]
 
@@ -34,8 +43,30 @@ books_df = pd.read_csv('./data/books_data.csv')
 ratings_df = pd.read_csv('./data/Books_rating.csv')
 merged_df = pd.merge(books_df, ratings_df, on='Title', how='inner')
 num_splits = len(output_dirs)
-split_size = len(merged_df) // num_splits
-splits = np.array_split(merged_df, num_splits)
+
+total_size = len(merged_df)
+split_sizes = np.random.randint(1, 101, size=num_splits)
+split_sizes = (split_sizes / 100) * total_size
+split_sizes = split_sizes.astype(int)
+
+splits = []
+used_indices = set()
+
+for size in split_sizes:
+    if size > total_size:
+        size = total_size
+    
+    start_idx = get_random_start_position(total_size, size)
+    end_idx = start_idx + size
+    
+    if end_idx > total_size:
+        end_idx = total_size
+        split = pd.concat([merged_df.iloc[start_idx:total_size], merged_df.iloc[:end_idx - total_size]])
+    else:
+        split = merged_df.iloc[start_idx:end_idx]
+    
+    splits.append(split)
+    used_indices.update(range(start_idx, end_idx))
 
 for i, split in enumerate(splits):
     if not os.path.exists(output_dirs[i]):
