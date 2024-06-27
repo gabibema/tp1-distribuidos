@@ -3,7 +3,7 @@ import logging
 from uuid import uuid4
 from abc import abstractmethod
 from .workers import Worker, ParallelWorker
-from lib.fault_tolerance import DumbDuplicateFilterState, save_state, load_state
+from lib.fault_tolerance import save_state, load_state, is_repeated
 
 class DynamicWorker(Worker):
     """
@@ -54,10 +54,10 @@ class DynamicRouter(DynamicWorker):
         super().new(*args, **kwargs)
         state = load_state()
         self.id = state.get('id', str(uuid4()))
-        self.peers = state.get('peers', set(self.id))
-        self.finished_peers = state.get('finished_peers', set())
+        self.peers = state.get('peers', [self.id])
+        self.finished_peers = state.get('finished_peers', {})
         self.peer_agora = control_queue_prefix
-        self.connection.create_control_queue(control_queue_prefix, self.control_callback, self.id)
+        self.connection.create_control_queue(control_queue_prefix, self.control_callback, self.src_queue, self.callback, self.id)
 
     def callback(self, ch, method, properties, body):
         """
@@ -68,8 +68,8 @@ class DynamicRouter(DynamicWorker):
         if message['request_id'] not in self.ongoing_requests:
             self.create_queues(message['request_id'])
         if message['items'] and message['items'][0].get('type') == 'EOF':
-            message = {'request_id': message['request_id'], 'message_id': message['message_id'], 'items': message['items'], 'type': 'EOF', 'intended_recipient': self.connection.id}
-            self.connection.send_message('', self.connection.next_peer, json.dumps(message))
+            message = {'request_id': message['request_id'], 'message_id': message['message_id'], 'items': message['items'], 'type': 'EOF', 'sender_id': self.id, 'intended_recipient': 'BROADCAST'}
+            self.connection.send_message(self.peer_agora, self.peer_agora, json.dumps(message))
         else:
             self.inner_callback(ch, method, properties, message)
         ch.basic_ack(delivery_tag=method.delivery_tag)
@@ -91,6 +91,7 @@ class DynamicRouter(DynamicWorker):
         'Send EOF to next layer'
         eof_message = json.loads(body)
         del eof_message['intended_recipient']
+        del eof_message['sender_id']
         for routing_key in self.routing_fn(eof_message):
             ch.basic_publish(exchange=self.dst_exchange, routing_key=routing_key, body=json.dumps(eof_message))
         self.ongoing_requests.discard(eof_message['request_id'])
@@ -146,7 +147,7 @@ class DynamicFilter(Worker):
     def callback(self, ch, method, properties, body):
         'Callback used to update the internal state, to change how future messages are filtered'
         msg = json.loads(body)
-        if self.duplicates_state.is_repeated(msg['request_id'], msg['message_id']):
+        if is_repeated(msg['request_id'], msg['message_id'], self.duplicates_state):
             # There's no need to update state for duplicate messages.
             ch.basic_ack(delivery_tag=method.delivery_tag)
             return
@@ -186,7 +187,7 @@ class DynamicFilter(Worker):
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
     def recover_from_state(self, state):
-        self.duplicates_state = state.get("duplicates_state", DumbDuplicateFilterState())
+        self.duplicates_state = state.get("duplicates_state", {})
         self.filter_state = state.get("filter_state", {})
         for request_id in self.filter_state:
             new_tmp_queue = f"{self.tmp_queues_prefix}_{msg['request_id']}_queue"

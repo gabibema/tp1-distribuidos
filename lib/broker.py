@@ -2,31 +2,40 @@ from abc import ABC, abstractmethod
 from time import sleep, time
 import json
 import pika
+import signal
 from lib.fault_tolerance import save_state
+
+PEER_ANNOUNCEMENT_TIMEOUT = 5
 
 class MessageBroker():
     def __init__(self, hostname):
         self.wait_connection()
         self.connection = pika.BlockingConnection(pika.ConnectionParameters(host=hostname))
-        self.next_peer = None # Placeholder until the leader tells us who our next peer is.
         self.channel = self.connection.channel()
 
     def create_queue(self, queue_name, persistent):
         self.channel.queue_declare(queue=queue_name, durable=persistent)
 
-    def create_control_queue(self, queue_prefix, callback, worker_id):
+    def create_control_queue(self, queue_prefix, control_callback, src_queue, callback, worker_id):
         save_state(id=worker_id)
         queue_name = queue_prefix + '_' + worker_id
         # open a new channel.
         self.channel = self.connection.channel()
         self.channel.queue_declare(queue=queue_name, durable=True)
-        self.channel.basic_consume(queue=queue_name, on_message_callback=callback)
+        self.channel.basic_consume(queue=queue_name, on_message_callback=control_callback)
         # Announce itself to the peers.
         router_name = queue_prefix
         self.create_router(router_name, pika.exchange_type.ExchangeType.fanout)
         self.link_queue(queue_name, router_name, router_name)
         message = {'type': 'NEW_PEER', 'sender_id': worker_id}
         self.send_message(router_name, router_name, json.dumps(message))
+        # Wait for peers to announce themselves before starting the worker.
+        channel = self.channel
+        connection = self.connection
+        def sigalarm_handler(*args):
+            channel.basic_consume(queue=src_queue, on_message_callback=callback)
+        signal.signal(signal.SIGALRM, sigalarm_handler)
+        signal.alarm(PEER_ANNOUNCEMENT_TIMEOUT)
 
     def create_router(self, router_name, router_type):
         self.channel.exchange_declare(exchange=router_name, exchange_type=router_type)

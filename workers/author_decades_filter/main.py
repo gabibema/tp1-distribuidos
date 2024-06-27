@@ -18,8 +18,9 @@ def aggregate(msg, accumulator):
     authors = msg['authors'][1:-1]
     for author in authors.split(','):
         accumulator[msg['request_id']] = accumulator.get(msg['request_id'], {})
-        accumulator[msg['request_id']][author] = accumulator[msg['request_id']].get(author, set())
-        accumulator[msg['request_id']][author].add(decade)
+        accumulator[msg['request_id']][author] = accumulator[msg['request_id']].get(author, [])
+        if decade not in accumulator[msg['request_id']][author]:
+            accumulator[msg['request_id']][author].append(decade)
 
 def result(msg, accumulator):
     authors = [author for author, decades in accumulator.pop(msg['request_id'], {}).items() if len(decades) >= 10]

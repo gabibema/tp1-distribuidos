@@ -5,7 +5,7 @@ import json
 import logging
 import pika
 from pika.exchange_type import ExchangeType
-from lib.fault_tolerance import DuplicateFilterState, save_state, load_state
+from lib.fault_tolerance import save_state, load_state, is_duplicate
 
 WAIT_TIME_PIKA=5
 
@@ -53,41 +53,41 @@ class ParallelWorker(Worker):
         super().new(*args, **kwargs)
         state = load_state()
         self.id = state.get('id', str(uuid4()))
-        self.peers = set(state.get('peers', self.id))
-        self.finished_peers = set(state.get('finished_peers', []))
+        self.peers = state.get('peers', [self.id])
+        self.finished_peers = state.get('finished_peers', {})
         self.peer_agora = control_queue_prefix
-        self.connection.create_control_queue(control_queue_prefix, self.control_callback, self.id)
+        self.connection.create_control_queue(control_queue_prefix, self.control_callback, self.src_queue, self.callback, self.id)
 
     def control_callback(self, ch, method, properties, body):
         'Callback given to a control queue to invoke for each message in the queue'
         message = json.loads(body)
-        if message['sender_id'] == self.id:
+        if message.get('sender_id') == self.id:
             self.connection.acknowledge_message(method.delivery_tag)
             return
+
         if message.get('type') == 'NEW_PEER':
-            known_peers = list(self.peers)
-            self.peers.add(message['sender_id'])
+            known_peers = self.peers
+            if message['sender_id'] not in self.peers:
+                self.peers.append(message['sender_id'])
             message = {'type': 'ADD_PEERS', 'peer_ids': known_peers, 'sender_id': self.id}
             self.connection.send_message(self.peer_agora, self.peer_agora, json.dumps(message))
         elif message.get('type') == 'ADD_PEERS':
-            self.peers.update(message['peer_ids'])
-            # Worker is ready to process incoming messages, subscribe it to work queue.
-            self.connection.set_consumer(self.src_queue, self.callback)
+            self.peers += [peer for peer in message['peer_ids'] if peer not in self.peers]
         elif message.get('type') == 'EOF':
             if message['intended_recipient'] == 'BROADCAST':
                 # EOF was received by another worker and is expecting an answer.
                 message['intended_recipient'] = message['sender_id']
                 message['sender_id'] = self.id
-                self.connection.send_message('', self.connection.next_peer, json.dumps(message))
-            elif message['intended_recipient'] == self.id and self.finished_peers:
-                # Other workers are responding to this worker's EOF.
-                self.finished_peers.add(message['sender_id'])
-                if self.finished_peers == self.peers:
-                    self.finished_peers = set()
+                self.connection.send_message(self.peer_agora, self.peer_agora, json.dumps(message))
+            elif message['intended_recipient'] == self.id and self.finished_peers and message['sender_id'] not in self.finished_peers:
+                # New workers are responding to this worker's EOF.
+                self.finished_peers[message['request_id']].append(message['sender_id'])
+                if self.finished_peers[message['request_id']] == self.peers:
+                    del self.finished_peers[message['request_id']]
                     self.end(ch, method, properties, body)
         else:
             logging.error(f"Unhandled message with unknown 'type': {json.dumps(message)}")
-        save_state(id=self.id, peers=list(self.peers), finished_peers=list(self.finished_peers))
+        save_state(id=self.id, peers=self.peers, finished_peers=self.finished_peers)
         self.connection.acknowledge_message(method.delivery_tag)
 
     def end(self, ch, method, properties, body):
@@ -108,9 +108,9 @@ class Filter(ParallelWorker):
         batch = json.loads(body)
         if batch['items'] and batch['items'][0].get('type') == 'EOF':
             logging.warning(batch)
-            message = {'request_id': batch['request_id'], 'message_id': batch['message_id'], 'type': 'EOF', 'items': batch['items'], 'sender_id': self.id, 'intended_recipient': self.connection.id}
-            self.connection.send_message('', self.connection.next_peer, json.dumps(message))
-            self.finished_peers.add(self.id)
+            message = {'request_id': batch['request_id'], 'message_id': batch['message_id'], 'type': 'EOF', 'items': batch['items'], 'sender_id': self.id, 'intended_recipient': 'BROADCAST'}
+            self.connection.send_message(self.peer_agora, self.peer_agora, json.dumps(message))
+            self.finished_peers[message['request_id']] = [self.id]
             save_state(id=self.id, peers=self.peers, finished_peers=self.finished_peers)
         else:
             batch['items'] = [msg for msg in batch['items'] if self.filter_condition(json.dumps(msg))]
@@ -128,9 +128,9 @@ class Map(ParallelWorker):
         batch = json.loads(body)
         if batch['items'] and batch['items'][0].get('type') == 'EOF':
             logging.warning(batch)
-            message = {'request_id': batch['request_id'], 'message_id': batch['message_id'], 'type': 'EOF', 'items': batch['items'], 'sender_id': self.id, 'intended_recipient': self.connection.id}
-            self.connection.send_message('', self.connection.next_peer, json.dumps(message))
-            self.finished_peers.add(self.id)
+            message = {'request_id': batch['request_id'], 'message_id': batch['message_id'], 'type': 'EOF', 'items': batch['items'], 'sender_id': self.id, 'intended_recipient': 'BROADCAST'}
+            self.connection.send_message(self.peer_agora, self.peer_agora, json.dumps(message))
+            self.finished_peers[message['request_id']] = [self.id]
             save_state(id=self.id, peers=self.peers, finished_peers=self.finished_peers)
         else:
             mapped_messages = [self.map_fn(item) for item in batch['items']]
@@ -149,9 +149,9 @@ class Router(ParallelWorker):
         batch = json.loads(body)
         if batch['items'] and batch['items'][0].get('type') == 'EOF':
             logging.warning(batch)
-            message = {'request_id': batch['request_id'], 'message_id': batch['message_id'], 'type': 'EOF', 'items': batch['items'], 'sender_id': self.id, 'intended_recipient': self.connection.id}
-            self.connection.send_message('', self.connection.next_peer, json.dumps(message))
-            self.finished_peers.add(self.id)
+            message = {'request_id': batch['request_id'], 'message_id': batch['message_id'], 'type': 'EOF', 'items': batch['items'], 'sender_id': self.id, 'intended_recipient': 'BROADCAST'}
+            self.connection.send_message(self.peer_agora, self.peer_agora, json.dumps(message))
+            self.finished_peers[message['request_id']] = [self.id]
             save_state(id=self.id, peers=self.peers, finished_peers=self.finished_peers)
         else:
             messages_per_target = {}
@@ -179,13 +179,13 @@ class Aggregate(Worker):
         self.result_fn = result_fn
         state = load_state()
         self.accumulator = state.get("accumulator", accumulator)
-        self.duplicate_filter = state.get("duplicate_filter", DuplicateFilterState())
+        self.duplicate_filter = state.get("duplicate_filter", {})
         super().new(*args, **kwargs)
 
     def callback(self, ch, method, properties, body):
         'Callback given to a queue to invoke for each message in the queue'
         batch = json.loads(body)
-        if self.duplicate_filter.is_duplicate(batch['request_id'], batch['message_id']):
+        if is_duplicate(batch['request_id'], batch['message_id'], self.duplicate_filter):
             # There's no need to update state for duplicate messages.
             self.connection.acknowledge_message(method.delivery_tag)
             return
