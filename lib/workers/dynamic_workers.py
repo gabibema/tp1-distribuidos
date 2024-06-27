@@ -107,7 +107,7 @@ class DynamicAggregate(DynamicWorker):
             self.end(msg)
         else:
             self.aggregate_fn(msg, self.accumulator)
-        save_state(ongoing_requests=self.ongoing_requests, accumulator=self.accumulator)
+        save_state(accumulator=self.accumulator)
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
     def end(self, eof_message):
@@ -129,14 +129,13 @@ class DynamicFilter(Worker):
     Subscribes to a queue where different filter conditions are announced for each request,
     and subscribes to the request specific queues when that condition arrives.
     """
-    def __init__(self, update_state, filter_condition, tmp_queues_prefix, *args, **kwargs):
+    def __init__(self, update_state, filter_condition, tmp_queues_prefix, connection, *args, **kwargs):
         self.update_state = update_state
         self.filter_condition = filter_condition
         self.tmp_queues_prefix = tmp_queues_prefix
-        state = load_state()
-        self.filter_state = state.get("filter_state", {})
-        self.duplicates_state = state.get("duplicates_state", DumbDuplicateFilterState())
-        super().new(*args, **kwargs)
+        self.connection = connection
+        self.recover_from_state(load_state())
+        super().new(connection, *args, **kwargs)
 
     def callback(self, ch, method, properties, body):
         'Callback used to update the internal state, to change how future messages are filtered'
@@ -152,7 +151,7 @@ class DynamicFilter(Worker):
             new_tmp_queue = f"{self.tmp_queues_prefix}_{msg['request_id']}_queue"
             self.connection.create_queue(new_tmp_queue, persistent=True)
             self.connection.set_consumer(new_tmp_queue, self.filter_callback)
-        save_state(filter_state=self.filter_state, duplicates_state=self.duplicates_state)
+            save_state(filter_state=self.filter_state, duplicates_state=self.duplicates_state)
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
     def client_EOF(self, body):
@@ -161,6 +160,7 @@ class DynamicFilter(Worker):
         self.filter_state = self.update_state(self.filter_state, msg)
         tmp_queue = f"{self.tmp_queues_prefix}_{msg['request_id']}_queue"
         self.connection.channel.queue_delete(queue=tmp_queue)
+        save_state(filter_state=self.filter_state, duplicates_state=self.duplicates_state)
 
     def filter_callback(self, ch, method, properties, body):
         'Callback used to filter messages in a queue'
@@ -178,3 +178,11 @@ class DynamicFilter(Worker):
             batch['items'] = filtered_messages
             self.connection.send_message(self.dst_exchange, self.routing_key, json.dumps(batch))
         ch.basic_ack(delivery_tag=method.delivery_tag)
+
+    def recover_from_state(self, state):
+        self.duplicates_state = state.get("duplicates_state", DumbDuplicateFilterState())
+        self.filter_state = state.get("filter_state", {})
+        for request_id in self.filter_state:
+            new_tmp_queue = f"{self.tmp_queues_prefix}_{msg['request_id']}_queue"
+            self.connection.create_queue(new_tmp_queue, persistent=True)
+            self.connection.set_consumer(new_tmp_queue, self.filter_callback)
