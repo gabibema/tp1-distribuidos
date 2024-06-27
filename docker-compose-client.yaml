@@ -12,9 +12,9 @@ services:
     volumes:
       - ./config/client.ini:/app/config.ini
       - ./lib:/app/lib
-      - ./data/cca74f4b-bce5-4253-9248-fb9f8a17e2ce:/app/data
+      - ./data/f8760039-d0f1-476b-8d7d-b98160ba0378:/app/data
     environment:
-      - CLIENT_ID=cca74f4b-bce5-4253-9248-fb9f8a17e2ce
+      - CLIENT_ID=f8760039-d0f1-476b-8d7d-b98160ba0378
       - OUTPUT_DIR=/app/data/results
     networks:
       - default
@@ -25,9 +25,9 @@ services:
     volumes:
       - ./config/client.ini:/app/config.ini
       - ./lib:/app/lib
-      - ./data/af70d96a-09b5-404a-b236-adb5587777bc:/app/data
+      - ./data/4ff5c5b5-5b41-4173-8211-0c1edac1b4a3:/app/data
     environment:
-      - CLIENT_ID=af70d96a-09b5-404a-b236-adb5587777bc
+      - CLIENT_ID=4ff5c5b5-5b41-4173-8211-0c1edac1b4a3
       - OUTPUT_DIR=/app/data/results
     networks:
       - default
@@ -38,100 +38,9 @@ services:
     volumes:
       - ./config/client.ini:/app/config.ini
       - ./lib:/app/lib
-      - ./data/fc5bd853-cc64-44f7-afa5-8c5662997825:/app/data
+      - ./data/7e016a48-bc4a-4af3-9bb4-83761989f52a:/app/data
     environment:
-      - CLIENT_ID=fc5bd853-cc64-44f7-afa5-8c5662997825
+      - CLIENT_ID=7e016a48-bc4a-4af3-9bb4-83761989f52a
       - OUTPUT_DIR=/app/data/results
     networks:
       - default
-
-  # client4:
-  #   image: client:latest
-  #   entrypoint: python3 /app/main.py
-  #   volumes:
-  #     - ./config/client.ini:/app/config.ini
-  #     - ./lib:/app/lib
-  #     - ./data/29c397ed-13eb-45bc-94ec-1a6582cb731a:/app/data
-  #   environment:
-  #     - CLIENT_ID=29c397ed-13eb-45bc-94ec-1a6582cb731a
-  #     - OUTPUT_DIR=/app/data/results
-  #   networks:
-  #     - default
-
-  # client5:
-  #   image: client:latest
-  #   entrypoint: python3 /app/main.py
-  #   volumes:
-  #     - ./config/client.ini:/app/config.ini
-  #     - ./lib:/app/lib
-  #     - ./data/454f09a2-8142-498f-bdec-504c100e85cb:/app/data
-  #   environment:
-  #     - CLIENT_ID=454f09a2-8142-498f-bdec-504c100e85cb
-  #     - OUTPUT_DIR=/app/data/results
-  #   networks:
-  #     - default
-
-  # client6:
-  #   image: client:latest
-  #   entrypoint: python3 /app/main.py
-  #   volumes:
-  #     - ./config/client.ini:/app/config.ini
-  #     - ./lib:/app/lib
-  #     - ./data/4a220114-6917-43e6-a7c7-1b791f654ec9:/app/data
-  #   environment:
-  #     - CLIENT_ID=4a220114-6917-43e6-a7c7-1b791f654ec9
-  #     - OUTPUT_DIR=/app/data/results
-  #   networks:
-  #     - default
-
-  # client7:
-  #   image: client:latest
-  #   entrypoint: python3 /app/main.py
-  #   volumes:
-  #     - ./config/client.ini:/app/config.ini
-  #     - ./lib:/app/lib
-  #     - ./data/39013c3c-5848-4f74-8300-af0ce7bf8c2b:/app/data
-  #   environment:
-  #     - CLIENT_ID=39013c3c-5848-4f74-8300-af0ce7bf8c2b
-  #     - OUTPUT_DIR=/app/data/results
-  #   networks:
-  #     - default
-
-  # client8:
-  #   image: client:latest
-  #   entrypoint: python3 /app/main.py
-  #   volumes:
-  #     - ./config/client.ini:/app/config.ini
-  #     - ./lib:/app/lib
-  #     - ./data/fa9561cd-115e-4fb6-8701-621276d27427:/app/data
-  #   environment:
-  #     - CLIENT_ID=fa9561cd-115e-4fb6-8701-621276d27427
-  #     - OUTPUT_DIR=/app/data/results
-  #   networks:
-  #     - default
-
-  # client9:
-  #   image: client:latest
-  #   entrypoint: python3 /app/main.py
-  #   volumes:
-  #     - ./config/client.ini:/app/config.ini
-  #     - ./lib:/app/lib
-  #     - ./data/2bb5276c-f1be-4455-baa5-06023a44ed5e:/app/data
-  #   environment:
-  #     - CLIENT_ID=2bb5276c-f1be-4455-baa5-06023a44ed5e
-  #     - OUTPUT_DIR=/app/data/results
-  #   networks:
-  #     - default
-
-  # client10:
-  #   image: client:latest
-  #   entrypoint: python3 /app/main.py
-  #   volumes:
-  #     - ./config/client.ini:/app/config.ini
-  #     - ./lib:/app/lib
-  #     - ./data/c8887490-ef31-459d-9e18-cf68fdb19edd:/app/data
-  #   environment:
-  #     - CLIENT_ID=c8887490-ef31-459d-9e18-cf68fdb19edd
-  #     - OUTPUT_DIR=/app/data/results
-  #   networks:
-  #     - default
