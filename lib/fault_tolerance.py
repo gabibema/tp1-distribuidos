@@ -43,4 +43,8 @@ def save_state(**kwargs):
 
 
 def load_state():
-    return {}
+    try:
+        with open('/var/worker_state', 'r') as statefile:
+            return json.load(statefile)
+    except:
+        return {}
