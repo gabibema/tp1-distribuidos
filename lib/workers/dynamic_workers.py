@@ -2,7 +2,7 @@ import json
 import logging
 from abc import abstractmethod
 from .workers import Worker, ParallelWorker
-from lib.fault_tolerance import State, is_repeated
+from lib.fault_tolerance import DumbDuplicateFilterState, is_repeated
 
 class DynamicWorker(Worker):
     """
@@ -50,6 +50,8 @@ class DynamicRouter(DynamicWorker):
     def __init__(self, routing_fn, control_queue_prefix, *args, **kwargs):
         self.routing_fn = routing_fn
         super().new(*args, **kwargs)
+        state = load_state()
+        self.ongoing_requests = state.get("ongoing_requests", self.ongoing_requests)
         self.connection.create_control_queue(control_queue_prefix, self.control_callback)
 
     def callback(self, ch, method, properties, body):
@@ -65,6 +67,7 @@ class DynamicRouter(DynamicWorker):
             self.connection.send_message('', self.connection.next_peer, json.dumps(message))
         else:
             self.inner_callback(ch, method, properties, message)
+        save_state(ongoing_requests=self.ongoing_requests)
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
     def inner_callback(self, ch, method, properties, batch):
@@ -87,6 +90,7 @@ class DynamicRouter(DynamicWorker):
         for routing_key in self.routing_fn(eof_message):
             ch.basic_publish(exchange=self.dst_exchange, routing_key=routing_key, body=json.dumps(eof_message))
         self.ongoing_requests.discard(eof_message['request_id'])
+        save_state(ongoing_requests=self.ongoing_requests)
         # DON'T delete queues yet! messages need to be consumed.
         # queues should be deleted by consumer after reading the EOF.
 
@@ -95,8 +99,8 @@ class DynamicAggregate(DynamicWorker):
     def __init__(self, aggregate_fn, result_fn, accumulator, *args, **kwargs):
         self.aggregate_fn = aggregate_fn
         self.result_fn = result_fn
-        self.accumulator = accumulator
-        self.message_id_per_request = {}
+        state = load_state()
+        self.accumulator = state.get("accumulator", accumulator)
         super().new(*args, **kwargs)
 
     def inner_callback(self, ch, method, properties, msg):
@@ -106,18 +110,18 @@ class DynamicAggregate(DynamicWorker):
             self.end(msg)
         else:
             self.aggregate_fn(msg, self.accumulator)
+        save_state(ongoing_requests=self.ongoing_requests, accumulator=self.accumulator)
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
     def end(self, eof_message):
-        self.message_id_per_request[eof_message['request_id']] = self.message_id_per_request.get(eof_message['request_id'], 1)
+        message_id = 1
         messages = self.result_fn(eof_message, self.accumulator)
         for msg in messages:
-            msg['message_id'] = self.message_id_per_request[msg['request_id']]
-            self.message_id_per_request[msg['request_id']] += 1
+            msg['message_id'] = message_id
+            message_id += 1
             routing_key = f"{self.routing_key}_{msg['request_id']}"
             self.connection.send_message(self.dst_exchange, routing_key, json.dumps(msg))
-        eof_message['message_id'] = self.message_id_per_request[msg['request_id']]
-        self.message_id_per_request[msg['request_id']] += 1
+        eof_message['message_id'] = message_id
         routing_key = f"{self.routing_key}_{eof_message['request_id']}"
         self.connection.send_message(self.dst_exchange, routing_key, json.dumps(eof_message))
 
@@ -132,14 +136,16 @@ class DynamicFilter(Worker):
         self.update_state = update_state
         self.filter_condition = filter_condition
         self.tmp_queues_prefix = tmp_queues_prefix
-        self.filter_state = {}
-        self.duplicates_state = {}
+        state = load_state()
+        self.filter_state = state.get("filter_state", {})
+        self.duplicates_state = state.get("duplicates_state", DumbDuplicateFilterState())
         super().new(*args, **kwargs)
 
     def callback(self, ch, method, properties, body):
         'Callback used to update the internal state, to change how future messages are filtered'
         msg = json.loads(body)
-        if is_repeated(msg['request_id'], msg['message_id'], self.duplicates_state):
+        if self.duplicates_state.is_repeated(msg['request_id'], msg['message_id']):
+            # There's no need to update state for duplicate messages.
             ch.basic_ack(delivery_tag=method.delivery_tag)
             return
         # Ignore EOFs through this queue. Each client will send their EOF through the tmp queue.
@@ -149,6 +155,7 @@ class DynamicFilter(Worker):
             new_tmp_queue = f"{self.tmp_queues_prefix}_{msg['request_id']}_queue"
             self.connection.create_queue(new_tmp_queue, persistent=True)
             self.connection.set_consumer(new_tmp_queue, self.filter_callback)
+        save_state(filter_state=self.filter_state, duplicates_state=self.duplicates_state)
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
     def client_EOF(self, body):

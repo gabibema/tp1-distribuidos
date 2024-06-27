@@ -4,7 +4,7 @@ import json
 import logging
 import pika
 from pika.exchange_type import ExchangeType
-from lib.fault_tolerance import State, is_duplicate
+from lib.fault_tolerance import DuplicateFilterState, is_duplicate, save_state, load_state
 
 WAIT_TIME_PIKA=5
 
@@ -155,15 +155,16 @@ class Aggregate(Worker):
     def __init__(self, aggregate_fn, result_fn, accumulator, *args, **kwargs):
         self.aggregate_fn = aggregate_fn
         self.result_fn = result_fn
-        self.accumulator = accumulator
-        self.message_id_per_request = {}
-        self.state = State()
+        state = load_state()
+        self.accumulator = state.get("accumulator", accumulator)
+        self.duplicate_filter = state.get("duplicate_filter", DuplicateFilterState())
         super().new(*args, **kwargs)
 
     def callback(self, ch, method, properties, body):
         'Callback given to a queue to invoke for each message in the queue'
         batch = json.loads(body)
-        if is_duplicate(batch['request_id'], batch['message_id'], self.state.duplicate_filter):
+        if self.duplicate_filter.is_duplicate(batch['request_id'], batch['message_id']):
+            # There's no need to update state for duplicate messages.
             self.connection.acknowledge_message(method.delivery_tag)
             return
         for item in batch['items']:
@@ -174,22 +175,22 @@ class Aggregate(Worker):
                 self.end(ch, method, properties, body)
             else:
                 self.aggregate_fn(message, self.accumulator)
+        save_state(accumulator=self.accumulator, duplicate_filter=self.duplicate_filter)
         self.connection.acknowledge_message(method.delivery_tag)
 
     def end(self, ch, method, properties, body):
         eof_message = json.loads(body)
-        self.message_id_per_request[eof_message['request_id']] = self.message_id_per_request.get(eof_message['request_id'], 1)
+        message_id = 1
         result = self.result_fn(eof_message, self.accumulator)
         messages = json.loads(result)
         if type(messages) != list:
             logging.error('Result is not a list')
             messages = [messages]
         for message in messages:
-            message['message_id'] = self.message_id_per_request[eof_message['request_id']]
-            self.message_id_per_request[eof_message['request_id']] += 1
+            message['message_id'] = message_id
+            message_id += 1
             self.connection.send_message(self.dst_exchange, self.routing_key, json.dumps(message))
-        eof_message['message_id'] = self.message_id_per_request[eof_message['request_id']]
-        self.message_id_per_request[eof_message['request_id']] += 1
+        eof_message['message_id'] = message_id
         self.connection.send_message(self.dst_exchange, self.routing_key, json.dumps(eof_message))
 
 
