@@ -96,6 +96,16 @@ services:
       TMP_QUEUES_PREFIX: "reviews_shard1"
 
 
+  90s_category_filter-1:
+    container_name: 90s_category_filter-1
+    image: 90s_category_filter:latest
+    entrypoint: python3 /app/main.py
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    links:
+      - rabbitmq
+
   90s_title_barrier-1:
     container_name: 90s_title_barrier-1
     image: 90s_title_barrier:latest

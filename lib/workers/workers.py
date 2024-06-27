@@ -2,15 +2,16 @@ from abc import ABC, abstractmethod
 from time import sleep, time
 import json
 import logging
-from pika.exchange_type import ExchangeType
 import pika
+from pika.exchange_type import ExchangeType
+from lib.fault_tolerance import State, is_duplicate
 
 WAIT_TIME_PIKA=5
 
 class Worker(ABC):
     def new(self, connection, src_queue='', src_exchange='', src_routing_key=[''], src_exchange_type=ExchangeType.direct, dst_exchange='', dst_routing_key='', dst_exchange_type=ExchangeType.direct):
         self.connection = connection
-        self.connection.channel.basic_qos(prefetch_count=50, global_qos=True)
+        self.connection.channel.basic_qos(prefetch_count=1, global_qos=True)
 
         # init source queue and bind to exchange
         self.connection.create_queue(src_queue, persistent=True)
@@ -155,12 +156,16 @@ class Aggregate(Worker):
         self.aggregate_fn = aggregate_fn
         self.result_fn = result_fn
         self.accumulator = accumulator
-        self.message_id = 1
+        self.message_id_per_request = {}
+        self.state = State()
         super().new(*args, **kwargs)
 
     def callback(self, ch, method, properties, body):
         'Callback given to a queue to invoke for each message in the queue'
         batch = json.loads(body)
+        if is_duplicate(batch['request_id'], batch['message_id'], self.state.duplicate_filter):
+            self.connection.acknowledge_message(method.delivery_tag)
+            return
         for item in batch['items']:
             message = {'request_id': batch['request_id'], 'message_id': batch['message_id']}
             message.update(item)
@@ -173,16 +178,18 @@ class Aggregate(Worker):
 
     def end(self, ch, method, properties, body):
         eof_message = json.loads(body)
-        logging.warning(f'{self.dst_exchange=}, {self.routing_key=}')
+        self.message_id_per_request[eof_message['request_id']] = self.message_id_per_request.get(eof_message['request_id'], 1)
         result = self.result_fn(eof_message, self.accumulator)
         messages = json.loads(result)
         if type(messages) != list:
             logging.error('Result is not a list')
             messages = [messages]
         for message in messages:
-            message['message_id'] = self.message_id
-            self.message_id += 1
+            message['message_id'] = self.message_id_per_request[eof_message['request_id']]
+            self.message_id_per_request[eof_message['request_id']] += 1
             self.connection.send_message(self.dst_exchange, self.routing_key, json.dumps(message))
+        eof_message['message_id'] = self.message_id_per_request[eof_message['request_id']]
+        self.message_id_per_request[eof_message['request_id']] += 1
         self.connection.send_message(self.dst_exchange, self.routing_key, json.dumps(eof_message))
 
 

@@ -18,7 +18,7 @@ class Client:
         self.port = config['port']
         self.batch_amount = config['batch_amount']
         self.checkpoint = None
-        
+
         self.books_path = config['books_path']
         self.reviews_path = config['reviews_path']
 
@@ -74,7 +74,7 @@ class Client:
         source = str(source)
         start_id = 1
         eof = None
-        
+
         if source in self.checkpoint:
             start_id = self.checkpoint[source]["message_id"]
             eof = self.checkpoint[source]["eof"]
@@ -85,10 +85,10 @@ class Client:
         with open(path, READ_MODE) as file:
             headers = file.readline()
             self.__queue_file_rows(file, queue, source, start_id, headers)
-            
+
 
     def __queue_file_rows(self, file, queue, source, start_id, headers):
-        message_id = 1
+        message_id = 0
         batch = [headers]
         for line in file:
             batch.append(line)

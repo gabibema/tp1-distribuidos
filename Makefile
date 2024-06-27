@@ -23,6 +23,7 @@ docker-image:
 	docker build -f ./workers/fiction_reviews_filter/Dockerfile -t "fiction_reviews_filter:latest" .
 	docker build -f ./workers/fiction_title_barrier/Dockerfile -t "fiction_title_barrier:latest" .
 	docker build -f ./workers/fiction_title_sharder/Dockerfile -t "fiction_title_sharder:latest" .
+	docker build -f ./workers/90s_category_filter/Dockerfile -t "90s_category_filter:latest" .
 	docker build -f ./workers/title_sharder/Dockerfile -t "title_sharder:latest" .
 
 
@@ -36,13 +37,15 @@ docker-compose-up: docker-image
 	docker compose -f docker-compose-dev.yaml up -d --build
 .PHONY: docker-compose-up
 
-docker-compose-client: docker-image-client 
+docker-compose-client: docker-image-client
+	rm -r data/*/results || true
 	docker compose -f docker-compose-client.yaml up -d --build
 .PHONY: docker-compose-client
 
 docker-compose-down:
 	docker compose -f docker-compose-dev.yaml stop -t 1
 	docker compose -f docker-compose-dev.yaml down
+	rm -r gateway/backup || true
 .PHONY: docker-compose-down
 
 docker-compose-down-client:
