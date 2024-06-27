@@ -81,6 +81,9 @@ class Gateway:
         result_data = {source: "" for source in source_mapping}
         eof_data = {}
         client_id = UUID(client_id)
+        for source in source_mapping:
+            result_data[source] = write_csv_to_string(source_mapping[source]["headers"], [])
+
         
         for result in results:
             source = result['source']
@@ -98,10 +101,7 @@ class Gateway:
             else:
                 rows = [[item[header] for header in headers] for item in body.get(key, [])]
             
-            if not result_data[source]:
-                result_data[source] = write_csv_to_string(headers, rows)
-            else:
-                result_data[source] += write_csv_to_string([], rows)  
+            result_data[source] += write_csv_to_string([], rows)  
 
         for source, csv_string in result_data.items():
             if not csv_string:
