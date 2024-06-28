@@ -3,7 +3,7 @@ import logging
 from uuid import uuid4
 from abc import abstractmethod
 from .workers import Worker, ParallelWorker
-from lib.fault_tolerance import save_state, load_state, is_repeated
+from lib.fault_tolerance import save_state, load_state, is_duplicate, is_repeated
 
 class DynamicWorker(Worker):
     """
@@ -109,16 +109,21 @@ class DynamicAggregate(DynamicWorker):
         self.result_fn = result_fn
         state = load_state()
         self.accumulator = state.get("accumulator", accumulator)
+        self.duplicate_filter = state.get("duplicate_filter", {})
         super().new(*args, **kwargs)
 
-    def inner_callback(self, ch, method, properties, msg):
+    def inner_callback(self, ch, method, properties, batch):
         'Callback given to a RabbitMQ queue to invoke for each message in the queue'
-        if msg['items'] and msg['items'][0].get('type') == 'EOF':
-            msg['type'] = msg['items'][0]['type']
-            self.end(msg)
+        if is_duplicate(batch['request_id'], batch['message_id'], self.duplicate_filter):
+            # There's no need to update state for duplicate messages.
+            self.connection.acknowledge_message(method.delivery_tag)
+            return
+        if batch['items'] and batch['items'][0].get('type') == 'EOF':
+            batch['type'] = batch['items'][0]['type']
+            self.end(batch)
         else:
-            self.aggregate_fn(msg, self.accumulator)
-        save_state(accumulator=self.accumulator)
+            self.aggregate_fn(batch, self.accumulator)
+        save_state(accumulator=self.accumulator, duplicate_filter=self.duplicate_filter)
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
     def end(self, eof_message):
@@ -194,6 +199,6 @@ class DynamicFilter(Worker):
         self.duplicates_state = state.get("duplicates_state", {})
         self.filter_state = state.get("filter_state", {})
         for request_id in self.filter_state:
-            new_tmp_queue = f"{self.tmp_queues_prefix}_{msg['request_id']}_queue"
+            new_tmp_queue = f"{self.tmp_queues_prefix}_{request_id}_queue"
             self.connection.create_queue(new_tmp_queue, persistent=True)
             self.connection.set_consumer(new_tmp_queue, self.filter_callback)

@@ -376,6 +376,18 @@ services:
     links:
       - rabbitmq
 
+  90s_reviews_filter-3:
+    container_name: 90s_reviews_filter-3
+    image: 90s_reviews_filter:latest
+    entrypoint: python3 /app/main.py
+    volumes:
+      - 90s_reviews_filter-3:/var
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    links:
+      - rabbitmq
+
   fiction_percentile_filter-1:
     container_name: fiction_percentile_filter-1
     image: fiction_percentile_filter:latest
@@ -413,4 +425,5 @@ volumes:
   fiction_title_sharder-1:
   90s_reviews_filter-1: # DynamicFilter
   90s_reviews_filter-2: # DynamicFilter
+  90s_reviews_filter-3: # DynamicFilter
   fiction_percentile_filter-1:

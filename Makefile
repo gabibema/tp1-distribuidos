@@ -35,6 +35,7 @@ docker-image-client:
 .PHONY: docker-image-client
 
 docker-compose-up: docker-image
+	rm -r gateway/backup || true
 	docker compose -f docker-compose-dev.yaml up -d --build
 .PHONY: docker-compose-up
 
@@ -47,7 +48,6 @@ docker-compose-down:
 	docker compose -f docker-compose-dev.yaml stop -t 1
 	docker compose -f docker-compose-dev.yaml down
 	docker volume rm $$(docker volume ls -q | grep tp1-distribuidos)
-	rm -r gateway/backup || true
 .PHONY: docker-compose-down
 
 docker-compose-down-client:
@@ -56,15 +56,20 @@ docker-compose-down-client:
 .PHONY: docker-compose-down-client
 
 docker-compose-down-all:
-	docker compose -f docker-compose-dev.yaml stop -t 1
-	docker compose -f docker-compose-dev.yaml down
 	docker compose -f docker-compose-client.yaml stop -t 1
 	docker compose -f docker-compose-client.yaml down
+	docker compose -f docker-compose-dev.yaml stop -t 1
+	docker compose -f docker-compose-dev.yaml down
+	docker volume rm $$(docker volume ls -q | grep tp1-distribuidos)
 .PHONY: docker-compose-down-all
 
 docker-compose-logs:
 	docker compose -f docker-compose-dev.yaml logs -f
 .PHONY: docker-compose-logs
+
+docker-compose-client-logs:
+	docker compose -f docker-compose-client.yaml logs -f
+.PHONY: docker-compose-client-logs
 
 write-clients:
 	@python3 docker-compose-writer.py $(N)
