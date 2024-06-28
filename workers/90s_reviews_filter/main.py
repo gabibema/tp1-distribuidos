@@ -2,7 +2,6 @@ import logging
 from pika.exchange_type import ExchangeType
 from lib.broker import MessageBroker
 from lib.workers import DynamicFilter
-import time
 
 def update_state(old_state, message):
     if message.get('type') == 'EOF':
@@ -15,7 +14,6 @@ def update_state(old_state, message):
 
 def filter_condition(state, msg):
     # if review is in the list of 90s titles
-    time.sleep(5)
     return msg['Title'] in state[msg['request_id']]
 
 def main():
