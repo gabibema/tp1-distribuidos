@@ -11,11 +11,7 @@ import signal
 
 EXCLUDED_SERVICES = ['rabbitmq', "client"]
 HEALTHCHECK_FREQUENCY = 5
-<<<<<<< Updated upstream
-HEALTHCHECK_TIMEOUT = 5
-=======
 HEALTHCHECK_TIMEOUT = 10
->>>>>>> Stashed changes
 
 def signal_handler(sig, frame):
     logging.warning(f"System shutdown received {sig}.")
