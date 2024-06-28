@@ -93,7 +93,7 @@ class Gateway:
             key = source_mapping[source]["key"]
 
             if body.get("type") == "EOF":
-                eof_data[source] = write_csv_to_string(headers, [])
+                eof_data[source] = write_csv_to_string([], [])
                 continue
 
             if source == "author_decades":
@@ -106,7 +106,6 @@ class Gateway:
         for source, csv_string in result_data.items():
             if not csv_string:
                 continue
-            print(f"Source: {source}")
             protocol.send_message(MESSAGE_FLAG['RESULT'], client_id, 1, 
                                   json.dumps({'file': source, 'body': csv_string}))
         

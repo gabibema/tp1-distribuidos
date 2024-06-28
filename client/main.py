@@ -40,10 +40,10 @@ def initialize_dir(output_dir):
 def main():
     config_params = get_config_params()
     initialize_log(config_params['log_level'])
-    initialize_dir(config_params['output_dir'])
 
     client_timeout = True
     while client_timeout:
+        initialize_dir(config_params['output_dir'])
         client = Client(config_params)
         client_timeout = client.start()
 
