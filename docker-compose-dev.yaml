@@ -280,18 +280,6 @@ services:
     links:
       - rabbitmq
 
-  title_sharder-4:
-    container_name: title_sharder-4
-    image: title_sharder:latest
-    entrypoint: python3 /app/main.py
-    volumes:
-      - title_sharder-4:/var
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-    links:
-      - rabbitmq
-
   90s_title_sharder-1:
     container_name: 90s_title_sharder-1
     image: 90s_title_sharder:latest
@@ -376,6 +364,30 @@ services:
     links:
       - rabbitmq
 
+  90s_reviews_filter-2:
+    container_name: 90s_reviews_filter-2
+    image: 90s_reviews_filter:latest
+    entrypoint: python3 /app/main.py
+    volumes:
+      - 90s_reviews_filter-2:/var
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    links:
+      - rabbitmq
+
+  90s_reviews_filter-3:
+    container_name: 90s_reviews_filter-3
+    image: 90s_reviews_filter:latest
+    entrypoint: python3 /app/main.py
+    volumes:
+      - 90s_reviews_filter-3:/var
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    links:
+      - rabbitmq
+
   fiction_percentile_filter-1:
     container_name: fiction_percentile_filter-1
     image: fiction_percentile_filter:latest
@@ -405,12 +417,13 @@ volumes:
   title_sharder-1: # DynamicRouter
   title_sharder-2: # DynamicRouter
   title_sharder-3: # DynamicRouter
-  title_sharder-4: # DynamicRouter
   90s_title_sharder-1:  # Router
   90s_title_sharder-2:  # Router
   author_sharder-1:
   fiction_review_nlp-1: # Map
   fiction_review_nlp-2: # Map
   fiction_title_sharder-1:
-  90s_reviews_filter-1:
+  90s_reviews_filter-1: # DynamicFilter
+  90s_reviews_filter-2: # DynamicFilter
+  90s_reviews_filter-3: # DynamicFilter
   fiction_percentile_filter-1:
