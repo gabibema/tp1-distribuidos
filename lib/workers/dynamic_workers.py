@@ -194,6 +194,6 @@ class DynamicFilter(Worker):
         self.duplicates_state = state.get("duplicates_state", {})
         self.filter_state = state.get("filter_state", {})
         for request_id in self.filter_state:
-            new_tmp_queue = f"{self.tmp_queues_prefix}_{msg['request_id']}_queue"
+            new_tmp_queue = f"{self.tmp_queues_prefix}_{request_id}_queue"
             self.connection.create_queue(new_tmp_queue, persistent=True)
             self.connection.set_consumer(new_tmp_queue, self.filter_callback)
