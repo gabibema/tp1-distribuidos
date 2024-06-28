@@ -2,6 +2,7 @@ import logging
 from pika.exchange_type import ExchangeType
 from lib.broker import MessageBroker
 from lib.workers import DynamicFilter
+import time
 
 def update_state(old_state, message):
     if message.get('type') == 'EOF':
@@ -9,11 +10,12 @@ def update_state(old_state, message):
         old_state.pop(message['request_id'], None)
     else:
         logging.warning(message['titles'][:5])
-        old_state[message['request_id']] = [message['titles']]
+        old_state[message['request_id']] = message['titles']
     return old_state
 
 def filter_condition(state, msg):
-    # if Book's average review NLP is greater than the 10th percentile from state
+    # if review is in the list of 90s titles
+    time.sleep(5)
     return msg['Title'] in state[msg['request_id']]
 
 def main():
