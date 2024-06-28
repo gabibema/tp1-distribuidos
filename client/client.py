@@ -10,7 +10,8 @@ from lib.transfer.transfer_protocol import MESSAGE_FLAG, MessageTransferProtocol
 READ_MODE = 'r'
 RESULT_FILES_AMOUNT = 5
 SERVER_TIMEOUT = 250
-RESULT_TIMEOUT = 500
+RESULT_TIMEOUT = 200
+MIN_TIMEOUT = 40
 
 def signal_handler(sig, frame):
     raise TimeoutError("System timeout.")
@@ -44,6 +45,7 @@ class Client:
 
 
     def start(self):
+        RESULT_TIMEOUT = max(RESULT_TIMEOUT-MIN_TIMEOUT,MIN_TIMEOUT )
         try:
             cliend_error = False
             self.conn = self.__try_connect('gateway', self.port)
