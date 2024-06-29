@@ -19,7 +19,7 @@ def main():
     # Pending: move variables to env.
     rabbit_hostname = 'rabbitmq'
     src_exchange = 'nlp_percentile_exchange'
-    src_queue = 'nlp_percentile_queue'
+    src_queue = 'nlp_percentile'
     src_routing_key = src_queue
     dst_routing_key = 'top_fiction_books'
     tmp_queues_prefix = 'avg_nlp'
