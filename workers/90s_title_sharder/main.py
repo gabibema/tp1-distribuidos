@@ -1,4 +1,5 @@
 import json
+import logging
 from lib.broker import MessageBroker
 from lib.workers import Router
 SHARD_COUNT = 1
@@ -22,8 +23,9 @@ def main():
     src_routing_key = '90s_filtered_queue'
     dst_exchange = '90s_books_sharded_exchange'
     dst_routing_key = '90s_books'
-    connection = MessageBroker(rabbit_hostname)
     control_queue_prefix = 'ctrl_90s_title_sharder'
+    logging.basicConfig(level=logging.WARNING, format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+    connection = MessageBroker(rabbit_hostname)
     worker = Router(routing_fn, control_queue_prefix, connection=connection, src_queue=src_queue, src_exchange=src_exchange, src_routing_key=src_routing_key, dst_exchange=dst_exchange, dst_routing_key=dst_routing_key)
     worker.start()
 

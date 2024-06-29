@@ -1,4 +1,5 @@
 import json
+import logging
 from pika.exchange_type import ExchangeType
 from lib.broker import MessageBroker
 from lib.workers import Aggregate
@@ -9,6 +10,7 @@ def aggregate(msg, accumulator):
 
 def result(msg, accumulator):
     titles = accumulator.pop(msg['request_id'], [])
+    logging.warning(f'Received {len(titles)} titles for {msg["request_id"]}.')
     return json.dumps([{'request_id': msg['request_id'], 'titles': titles}])
 
 def main():
@@ -25,6 +27,7 @@ def main():
     dst_exchange = 'fiction_titles_barrier_exchange'
     dst_routing_key = f'fiction_titles_shard{shard_id}'
     accumulator = {}
+    logging.basicConfig(level=logging.WARNING, format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
     connection = MessageBroker(rabbit_hostname)
     worker = Aggregate(aggregate, result, accumulator, connection=connection, src_queue=src_queue, src_exchange=src_exchange, src_routing_key=src_routing_key, dst_exchange=dst_exchange, dst_exchange_type=ExchangeType.fanout, dst_routing_key=dst_routing_key)
     worker.start()

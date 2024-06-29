@@ -21,7 +21,7 @@ def main():
     shard_id = 0
     rabbit_hostname = 'rabbitmq'
     src_routing_key = f'90s_titles_shard{shard_id}'
-    src_queue = src_routing_key + '_queue'
+    src_queue = src_routing_key
     src_exchange = '90s_titles_barrier_exchange'
     dst_routing_key = f'90s_rev_shard{shard_id}_queue'
     tmp_queues_prefix = f'90s_reviews_shard{shard_id}'

@@ -31,7 +31,6 @@ class MessageBroker():
         self.send_message(router_name, router_name, json.dumps(message))
         # Wait for peers to announce themselves before starting the worker.
         channel = self.channel
-        connection = self.connection
         def sigalarm_handler(*args):
             channel.basic_consume(queue=src_queue, on_message_callback=callback)
         signal.signal(signal.SIGALRM, sigalarm_handler)

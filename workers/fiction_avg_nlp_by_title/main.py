@@ -16,7 +16,8 @@ def aggregate(message, accumulator):
 
 def result(msg, accumulator):
     acc = accumulator.pop(msg['request_id'], {})
-    items = [{'Title': title, 'average': values.sum/values.count} for title, values in acc.items()]
+    logging.warning(f'Received {sum(values.count for values in acc.values())} reviews across {len(acc)} books.')
+    items = [{'Title': title, 'average': round(values.sum/values.count, 5)} for title, values in acc.items()]
     return [{'request_id': msg['request_id'], 'items': items[i:i+BATCH_SIZE]} for i in range(0, len(items), BATCH_SIZE)]
 
 def main():

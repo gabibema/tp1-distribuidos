@@ -1,4 +1,5 @@
 import json
+import logging
 from pika.exchange_type import ExchangeType
 from lib.broker import MessageBroker
 from lib.workers import Filter
@@ -20,8 +21,9 @@ def main():
     src_queue = 'computers_queue'
     src_exchange = 'books_exchange'
     dst_routing_key = 'computer_books'
-    connection = MessageBroker(rabbit_hostname)
     control_queue_prefix = 'ctrl_computer_books_filter'
+    logging.basicConfig(level=logging.WARNING, format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+    connection = MessageBroker(rabbit_hostname)
     worker = Filter(title_filter, control_queue_prefix, connection=connection, src_queue=src_queue, src_exchange=src_exchange, src_exchange_type=ExchangeType.fanout, dst_routing_key=dst_routing_key)
     worker.start()
 

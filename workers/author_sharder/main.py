@@ -22,9 +22,9 @@ def main():
     src_exchange = 'books_exchange'
     dst_exchange = 'authors_sharded_exchange'
     dst_routing_key = 'authors'
+    control_queue_prefix = 'ctrl_author_sharder'
     logging.basicConfig(level=logging.WARNING, format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
     connection = MessageBroker(rabbit_hostname)
-    control_queue_prefix = 'ctrl_author_sharder'
     worker = Router(routing_fn, control_queue_prefix, connection=connection, src_queue=src_queue, src_exchange=src_exchange, src_exchange_type=ExchangeType.fanout, dst_exchange=dst_exchange, dst_routing_key=dst_routing_key)
     worker.start()
 
