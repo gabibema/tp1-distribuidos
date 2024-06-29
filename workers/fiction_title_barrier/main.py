@@ -1,4 +1,5 @@
 import json
+import logging
 from pika.exchange_type import ExchangeType
 from lib.broker import MessageBroker
 from lib.workers import Aggregate
@@ -9,6 +10,7 @@ def aggregate(msg, accumulator):
 
 def result(msg, accumulator):
     titles = accumulator.pop(msg['request_id'], [])
+    logging.warning(f'Received {len(titles)} titles for {msg["request_id"]}.')
     return json.dumps([{'request_id': msg['request_id'], 'titles': titles}])
 
 def main():

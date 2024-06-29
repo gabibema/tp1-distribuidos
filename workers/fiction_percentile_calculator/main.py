@@ -1,5 +1,6 @@
 import json
 import random
+import logging
 from pika.exchange_type import ExchangeType
 from lib.broker import MessageBroker
 from lib.workers import Aggregate
@@ -14,6 +15,7 @@ def result(msg, accumulator):
     if len(acc) <= 0:
         return json.dumps([{'request_id': msg['request_id'], 'percentile': float('inf')}])
     percentile = kth_smallest(percentile_10_idx, acc, 0, len(acc) - 1)
+    logging.warning(f'Received {len(acc)} titles for {msg["request_id"]}. The 10th percentile is {percentile}')
     return json.dumps([{'request_id': msg['request_id'], 'percentile': percentile}])
 
 def kth_smallest(k, buffer, start, end):
