@@ -1,14 +1,12 @@
 import json
-import logging
 from heapq import nlargest
 from lib.broker import MessageBroker
 from lib.workers import Aggregate
 
 def aggregate(msg, accumulator):
-    if type(msg) != list:
-        msg = [msg]
-    accumulator[msg[0]['request_id']] = accumulator.get(msg[0]['request_id'], [])
-    accumulator[msg[0]['request_id']].extend(msg)
+    accumulator[msg['request_id']] = accumulator.get(msg['request_id'], [])
+    book = {'Title': msg['Title'], 'count': msg['count']}
+    accumulator[msg['request_id']].append(book)
 
 def result(msg, accumulator):
     request_titles = accumulator.pop(msg['request_id'], [])
@@ -22,7 +20,6 @@ def main():
     src_exchange='popular_90s_exchange'
     dst_routing_key = 'top_90s_books'
     accumulator = {}
-    logging.basicConfig(level=logging.WARNING, format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
     connection = MessageBroker(rabbit_hostname)
     worker = Aggregate(aggregate, result, accumulator, connection=connection, src_queue=src_queue, src_exchange=src_exchange, src_routing_key=src_routing_key, dst_routing_key=dst_routing_key)
     worker.start()
