@@ -1,4 +1,5 @@
 import json
+import logging
 from heapq import nlargest
 from lib.broker import MessageBroker
 from lib.workers import Aggregate
@@ -21,6 +22,7 @@ def main():
     src_exchange='popular_90s_exchange'
     dst_routing_key = 'top_90s_books'
     accumulator = {}
+    logging.basicConfig(level=logging.WARNING, format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
     connection = MessageBroker(rabbit_hostname)
     worker = Aggregate(aggregate, result, accumulator, connection=connection, src_queue=src_queue, src_exchange=src_exchange, src_routing_key=src_routing_key, dst_routing_key=dst_routing_key)
     worker.start()
