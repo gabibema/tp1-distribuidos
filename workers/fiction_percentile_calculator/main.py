@@ -45,9 +45,9 @@ def kth_smallest(k, buffer, start, end):
 
 def choose_pivot(buffer, i, j):
     "Find 3 random posible pivots, and choose the one with the intermediate value"
-    pivot_1 = buffer[random.randrange(0,j+1)]
-    pivot_2 = buffer[random.randrange(0,j+1)]
-    pivot_3 = buffer[random.randrange(0,j+1)]
+    pivot_1 = buffer[random.randrange(i,j+1)]
+    pivot_2 = buffer[random.randrange(i,j+1)]
+    pivot_3 = buffer[random.randrange(i,j+1)]
     if pivot_1 <= pivot_2 <= pivot_3:
         return pivot_2
     if pivot_1 <= pivot_3 <= pivot_2:
